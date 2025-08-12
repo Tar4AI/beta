@@ -3,44 +3,37 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#0a1120" />
-  <meta name="theme-color" content="#0a1120" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#1a202c" />
+  <meta name="theme-color" content="#1a202c" media="(prefers-color-scheme: dark)" />
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Mobile RTA (FFT/Oct/Heatmap + dB-A)</title>
 
   <style>
     :root{
-      --bg1:#0b1220; --bg2:#0a1120; --card:#111827; --text:#e5e7eb; --muted:#9ca3af;
-      --gridH:rgba(255,255,255,.06); --gridV:rgba(255,255,255,.035);
-      --frame:rgba(255,255,255,.08); --label:rgba(255,255,255,.55);
-      --fft:#34d399; --peak:#a78bfa; --hold:#facc15; --bar:#34d399;
-
-      /* heatmap palette (5 stops) */
-      --heatmap-color-1:#0b1220;
-      --heatmap-color-2:#3b82f6;
-      --heatmap-color-3:#22c55e;
-      --heatmap-color-4:#facc15;
-      --heatmap-color-5:#ef4444;
-
-      --dba-meter-bg-0-50:#22c55e; --dba-meter-bg-50-70:#facc15; --dba-meter-bg-70-90:#ef4444; --dba-meter-bg-90-140:#be123c;
-
+      --bg1:#1a202c; --bg2:#1a202c; --card:#2d3748; --text:#cbd5e1; --muted:#718096;
+      --gridH:rgba(255,255,255,.08); --gridV:rgba(255,255,255,.04);
+      --frame:rgba(255,255,255,.1); --label:rgba(255,255,255,.65);
+      --fft:#68d391; --peak:#b794f4; --hold:#f6ad55; --bar:#68d391;
+      --heatmap-color-1:#1a202c; --heatmap-color-2:#4a5568; --heatmap-color-3:#68d391;
+      --heatmap-color-4:#f6ad55; --heatmap-color-5:#e53e3e;
+      --dba-meter-bg-0-50:#48bb78; --dba-meter-bg-50-70:#f6ad55; --dba-meter-bg-70-90:#e53e3e; --dba-meter-bg-90-140:#c53030;
       /* ความกว้างสไลด์เรนจ์ (ย่อได้ที่นี่) */
       --oct-range-slider-width: 180px;
     }
     :root{ color-scheme:dark }
-    html{ background:#0a1120 }
+    html{ background:#1a202c }
     body{
       margin:0; height:100%;
-      background:radial-gradient(1200px 600px at 70% -10%, #0f1730 10%, var(--bg1) 60%, var(--bg2) 100%);
+      background:radial-gradient(1200px 600px at 70% -10%, #2d3748 10%, var(--bg1) 60%, var(--bg2) 100%);
       color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans Thai",sans-serif;
       -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; overscroll-behavior:contain;
     }
     /* safe-area */
-    body::before,body::after{content:"";position:fixed;left:0;right:0;z-index:9999;background:#0a1120;pointer-events:none}
+    body::before,body::after{content:"";position:fixed;left:0;right:0;z-index:9999;background:#1a202c;pointer-events:none}
     body::before{top:0;height:env(safe-area-inset-top)} body::after{bottom:0;height:env(safe-area-inset-bottom)}
     @supports(padding: env(safe-area-inset-left)){
-      html::before,html::after{content:"";position:fixed;top:0;bottom:0;background:#0a1120;z-index:9998;pointer-events:none}
+      html::before,html::after{content:"";position:fixed;top:0;bottom:0;background:#1a202c;z-index:9998;pointer-events:none}
       html::before{left:0;width:env(safe-area-inset-left)} html::after{right:0;width:env(safe-area-inset-right)}
     }
 
@@ -51,21 +44,21 @@
       padding-bottom:calc(12px + env(safe-area-inset-bottom));
     }
     .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-    .card{background:var(--card);border:1px solid #1f2937;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.25);padding:12px}
+    .card{background:var(--card);border:1px solid #4a5568;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.25);padding:12px}
     button,select,input[type=range],input[type=number]{-webkit-tap-highlight-color:transparent}
-    button{background:#10b981;border:none;color:white;padding:10px 14px;border-radius:12px;font-weight:700;cursor:pointer}
-    button.secondary{background:#374151} button.ghost{background:#1f2937}
+    button{background:#48bb78;border:none;color:white;padding:10px 14px;border-radius:12px;font-weight:700;cursor:pointer}
+    button.secondary{background:#4a5568} button.ghost{background:#4a5568}
     label{font-size:12px;color:var(--muted)}
     .meters{display:grid;grid-template-columns:1fr;gap:12px}
-    canvas{width:100%;height:320px;background:#0b1220;border-radius:12px;touch-action:none}
+    canvas{width:100%;height:320px;background:#1a202c;border-radius:12px;touch-action:none}
 
-    #dbMeterContainer{position:relative;background:rgba(255,255,255,.08);border-radius:999px;overflow:hidden}
+    #dbMeterContainer{position:relative;background:rgba(255,255,255,.1);border-radius:999px;overflow:hidden}
     #dbMeterCanvas{height:20px;background:transparent;border-radius:999px}
     .dbLabel{position:absolute;font-size:10px;color:var(--muted);bottom:4px}
 
     .hint{font-size:12px;color:var(--muted)}
     .kv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-    .kv div{background:#0e1628;border:1px solid #1f2937;border-radius:12px;padding:8px}
+    .kv div{background:#2d3748;border:1px solid #4a5568;border-radius:12px;padding:8px}
     .kv b{display:block;color:#cbd5e1;font-size:12px;margin-bottom:4px}
     .badges{display:flex;justify-content:flex-end;gap:6px;margin:4px 0 6px 0}
     .badge{padding:4px 8px;border-radius:999px;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.12);font-size:12px;color:#e5e7eb;white-space:nowrap}
@@ -73,7 +66,7 @@
     .plot{position:relative}
 
     .dba-values-row{display:flex;justify-content:space-between;gap:8px}
-    .dba-values-row .kv-item{flex:1;background:#0e1628;border:1px solid #1f2937;border-radius:12px;padding:8px;text-align:center}
+    .dba-values-row .kv-item{flex:1;background:#2d3748;border:1px solid #4a5568;border-radius:12px;padding:8px;text-align:center}
     .dba-values-row .kv-item b{display:block;color:#cbd5e1;font-size:12px;margin-bottom:4px}
 
     /* ===== Inline compact octave range slider ===== */
@@ -91,8 +84,8 @@
 <body>
   <div class="wrap">
     <!-- Error banner -->
-    <div id="errBox" class="card" style="display:none;border-color:#b91c1c;background:#111317">
-      <b style="color:#fecaca">ไม่สามารถเริ่มวัดได้</b>
+    <div id="errBox" class="card" style="display:none;border-color:#e53e3e;background:#1c2430">
+      <b style="color:#fca5a5">ไม่สามารถเริ่มวัดได้</b>
       <div id="errMsg" class="hint" style="color:#fca5a5">—</div>
     </div>
 
@@ -189,12 +182,21 @@
 
       <div class="card" id="heatmapCard">
         <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:2px">
-          <b>Spectrogram / Heatmap</b>
+          <b id="heatmapTitle">Spectrogram / Heatmap</b>
           <div class="row">
-            <button id="btnToggleHeatmap" class="ghost" aria-pressed="true">🔥 Heatmap: ON</button>
-            <!-- NEW: toggle color mapping mode -->
-            <button id="btnColorMode" class="ghost" aria-pressed="false">🎨 Color: Linear</button>
+            <!-- New: Heatmap Range Control -->
+            <label style="display:flex;align-items:center;gap:6px">Range (dB)
+              <input id="heatmapRangeSlider" type="range" min="10" max="100" step="5" value="80" aria-label="Heatmap range">
+              <select id="heatmapRangePreset">
+                <option value="40">40</option>
+                <option value="60">60</option>
+                <option value="80" selected>80</option>
+                <option value="100">100</option>
+              </select>
+            </label>
+            <span class="hint" id="heatmapRangeText">0 to -80 dBFS</span>
           </div>
+          <button id="btnToggleHeatmap" class="ghost" aria-pressed="true">🔥 Heatmap: ON</button>
         </div>
         <div class="plot">
           <canvas id="heatmapCanvas" width="1200" height="320"></canvas>
@@ -230,7 +232,7 @@
 
     <div class="card row" style="justify-content:space-between;align-items:center;margin-top:0">
       <div class="hint">ตั้งค่าออฟเซ็ตเพื่อแปลง dBFS เป็น dBA (จากไมค์มือถือ)</div>
-      <label>Calibration Offset (dB) <input id="calibrationOffset" type="number" min="0" step="0.1" value="80" style="width:60px;padding:4px;border-radius:6px;border:1px solid #374151;background:#1f2937;color:white;"></label>
+      <label>Calibration Offset (dB) <input id="calibrationOffset" type="number" min="0" step="0.1" value="80" style="width:60px;padding:4px;border-radius:6px;border:1px solid #4a5568;background:#2d3748;color:white;"></label>
     </div>
 
     <div class="card hint">ข้อจำกัด: ไมค์มือถือมี DSP/AGC และการตอบสนองความถี่ไม่แฟลต ใช้ดูแนว EQ ได้แต่ไม่ใช่มาตรวัด SPL มืออาชีพ</div>
@@ -242,10 +244,6 @@
     // ===== Const & helpers =====
     const PAD={L:40,R:10,T:10,B:32}, LABEL_Y=10;
     const HEATMAP_UPDATE_MS=33, HEATMAP_FREQ_BINS=300;
-
-    // dB range used to normalize heatmap (tune ifต้องการ)
-    const HEATMAP_DB_MIN = -90;  // floor dBFS
-    const HEATMAP_DB_MAX = -10;  // ceiling dBFS
 
     const getStyle=(p)=>getComputedStyle(document.documentElement).getPropertyValue(p).trim();
     const GRID_H=getStyle('--gridH'), GRID_V=getStyle('--gridV');
@@ -264,7 +262,6 @@
     const btnHold=document.getElementById('btnHold');
     const btnClear=document.getElementById('btnClear');
     const btnToggleHeatmap=document.getElementById('btnToggleHeatmap');
-    const btnColorMode=document.getElementById('btnColorMode');
     const btnResetDba=document.getElementById('btnResetDba');
 
     const fftSel=document.getElementById('fft');
@@ -293,17 +290,21 @@
     const octTitle=document.getElementById('octTitle');
     const octResSel=document.getElementById('octRes');
 
-    // ใหม่: preset + slider + label
+    // Octave range slider elements
     const octRangePreset=document.getElementById('octRangePreset');
     const octRangeSlider=document.getElementById('octRangeSlider');
     const octRangeText=document.getElementById('octRangeText');
+
+    // New: Heatmap range slider elements
+    const heatmapRangeSlider=document.getElementById('heatmapRangeSlider');
+    const heatmapRangePreset=document.getElementById('heatmapRangePreset');
+    const heatmapRangeText=document.getElementById('heatmapRangeText');
 
     const rmsEl=document.getElementById('rms');
     const peakEl=document.getElementById('peak');
 
     const ctxFFT=fftCanvas.getContext('2d');
     const ctxOct=octCanvas.getContext('2d');
-    theatmap = heatmapCanvas.getContext ? heatmapCanvas : null;
     const ctxHeatmap=heatmapCanvas.getContext('2d');
     const ctxDbMeter=dbMeterCanvas.getContext('2d');
 
@@ -315,8 +316,8 @@
     let avgBuffer=null;
     let running=false, holdEnabled=false;
 
-    let peakArray=null;      // FFT hold
-    let peakOct=null;        // Octave hold
+    let peakArray=null;     // FFT hold
+    let peakOct=null;       // Octave hold
     let guideFFT=null, guideOCT=null, guideHeatmap=null;
 
     let octN=6;
@@ -331,11 +332,9 @@
     let maxDba=-Infinity;
     let dbaValues=[];
 
-    // Dynamic range (Octave bars)
+    // Dynamic range
     let octRangeMax=parseInt(octRangePreset.value,10);
-
-    // Heatmap color mapping mode: 'linear' | 'log' | 'sigmoid'
-    let heatColorMode='linear';
+    let heatmapRangeMax=parseInt(heatmapRangePreset.value,10);
 
     // ===== Freq helpers =====
     const fmax=()=>Math.min(sampleRate/2,20000);
@@ -344,57 +343,17 @@
     function xToFreq(x,w){const fm=fmax();const plotW=w-PAD.L-PAD.R;const t=clamp01((x-PAD.L)/plotW);const lf=Math.log10(fmin)+t*(Math.log10(fm)-Math.log10(fmin));return Math.pow(10,lf);}
     function mapDbToY(db,h){const norm=clamp01((db+100)/100);const plotH=h-PAD.T-PAD.B;return PAD.T+(1-norm)*plotH;}
     function mapLinearToYOct(v,h){const norm=clamp01(v/Math.max(1,octRangeMax));const plotH=h-PAD.T-PAD.B;return PAD.T+(1-norm)*plotH;}
-
-    // ===== Heatmap color utilities =====
-    function hexToRgb(hex){
-      let h = hex.replace('#','').trim();
-      if(h.length===3) h = h.split('').map(c=>c+c).join('');
-      const n = parseInt(h,16);
-      return {r:(n>>16)&255, g:(n>>8)&255, b:n&255};
-    }
-    const CM_STOPS = [
-      hexToRgb(getStyle('--heatmap-color-1')),
-      hexToRgb(getStyle('--heatmap-color-2')),
-      hexToRgb(getStyle('--heatmap-color-3')),
-      hexToRgb(getStyle('--heatmap-color-4')),
-      hexToRgb(getStyle('--heatmap-color-5')),
-    ];
-    function lerp(a,b,t){return a+(b-a)*t;}
-    function lerpColor(c1,c2,t){
-      return `rgb(${Math.round(lerp(c1.r,c2.r,t))},${Math.round(lerp(c1.g,c2.g,t))},${Math.round(lerp(c1.b,c2.b,t))})`;
-    }
-    function normalizeDb(db){
-      // clamp & normalize to 0..1
-      const x = (db - HEATMAP_DB_MIN) / (HEATMAP_DB_MAX - HEATMAP_DB_MIN);
-      return clamp01(x);
-    }
-    function shapeNorm(t, mode){
-      t = clamp01(t);
-      if(mode==='linear') return t;
-      if(mode==='log'){ // emphasize quieter → spread mid
-        const k = 9; // bigger = stronger log
-        return Math.log10(1 + k*t) / Math.log10(1 + k);
-      }
-      if(mode==='sigmoid'){ // compress extremes, highlight center
-        const k = 8; // slope
-        const s = 1/(1+Math.exp(-k*(t-0.5)));
-        const sMin = 1/(1+Math.exp(+k*0.5));
-        const sMax = 1/(1+Math.exp(-k*0.5));
-        return (s - sMin) / (sMax - sMin);
-      }
-      return t;
-    }
-    function colorFromStops(t){
-      const n = CM_STOPS.length - 1;
-      const p = t * n;
-      const i = Math.min(n-1, Math.max(0, Math.floor(p)));
-      const f = p - i;
-      return lerpColor(CM_STOPS[i], CM_STOPS[i+1], f);
-    }
-    function mapDbToColorScaled(db){
-      const t = normalizeDb(db);
-      const shaped = shapeNorm(t, heatColorMode);
-      return colorFromStops(shaped);
+    
+    // New: color mapping for heatmap using dynamic range
+    function mapDbToColorHeatmap(db) {
+      const maxDb = 0;
+      const minDb = maxDb - heatmapRangeMax;
+      const t = clamp01((db - minDb) / (maxDb - minDb));
+      if (t < 0.25) return getStyle('--heatmap-color-1');
+      if (t < 0.5) return getStyle('--heatmap-color-2');
+      if (t < 0.75) return getStyle('--heatmap-color-3');
+      if (t < 0.9) return getStyle('--heatmap-color-4');
+      return getStyle('--heatmap-color-5');
     }
 
     function genBands(n){
@@ -446,7 +405,7 @@
       [31.5,63,125,250,500,1000,2000,4000,8000,16000].forEach(t=>{const x=mapLogX(t,w);ctx.fillText(t>=1000?(t/1000)+'k':t,x-8,h-LABEL_Y);});
     }
     function drawPeakLine(ctx,x,h,color,dashed=false){const y0=PAD.T,y1=h-PAD.B;ctx.save();ctx.strokeStyle=color;ctx.lineWidth=1;if(dashed)ctx.setLineDash([5,5]);ctx.beginPath();ctx.moveTo(x,y0);ctx.lineTo(x,y1);ctx.stroke();ctx.restore();}
-    function drawGuide(ctx,x,h){ctx.save();ctx.strokeStyle='rgba(96,165,250,.75)';ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(x,PAD.T);ctx.lineTo(x,h-PAD.B);ctx.stroke();ctx.restore();}
+    function drawGuide(ctx,x,h){ctx.save();ctx.strokeStyle='rgba(100,149,237,.75)';ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(x,PAD.T);ctx.lineTo(x,h-PAD.B);ctx.stroke();ctx.restore();}
 
     function drawFFT(){
       const {width:w,height:h}=ctxFFT.canvas; drawBackground(ctxFFT); if(!freqArray) return;
@@ -461,9 +420,9 @@
       ctxFFT.beginPath(); started=false;
       for(let i=1;i<N;i++){const f=i*fpb; if(f<20)continue; if(f>20000)break; const x=mapLogX(f,w), y=mapDbToY(dbfs(peakArray[i]||0),h); if(!started){ctxFFT.moveTo(x,y);started=true;} else ctxFFT.lineTo(x,y);}
       ctxFFT.save(); ctxFFT.globalAlpha=.35; ctxFFT.strokeStyle=PEAK_COLOR; ctxFFT.lineWidth=1.25; ctxFFT.stroke(); ctxFFT.restore();
-      drawPeakLine(ctxFFT,mapLogX(peakFreqNow,w),h,'rgba(96,165,250,.6)');
+      drawPeakLine(ctxFFT,mapLogX(peakFreqNow,w),h,'rgba(100,149,237,.6)');
       let holdBin=0, holdVal=0; for(let i=0;i<N;i++) if(peakArray[i]>holdVal){holdVal=peakArray[i];holdBin=i;}
-      if(holdVal>0) drawPeakLine(ctxFFT,mapLogX(holdBin*fpb,w),h,'rgba(250,204,21,.55)',true);
+      if(holdVal>0) drawPeakLine(ctxFFT,mapLogX(holdBin*fpb,w),h,'rgba(246,173,85,.55)',true);
       fftPeakText.textContent=`Peak: ${fmtHz(peakFreqNow)} • ${peakDbNow.toFixed(1)} dBFS`;
       if(holdVal>0){fftHoldText.style.display=''; fftHoldText.textContent=`Hold: ${fmtHz(holdBin*fpb)} • ${dbfs(holdVal).toFixed(1)} dBFS`;} else fftHoldText.style.display='none';
       if(guideFFT) drawGuide(ctxFFT,guideFFT.xPx,h);
@@ -479,38 +438,26 @@
       for(let i=0;i<vals.length;i++){const b=bands[i]; const xL=mapLogX(b.fl,w), xR=mapLogX(b.fh,w); const barW=Math.max(2,xR-xL-2); const y=mapLinearToYOct(vals[i],h); const hh=(h-PAD.B-y); ctxOct.fillRect(xL+1,y,barW,Math.max(1,hh));}
       ctxOct.beginPath(); for(let i=0;i<vals.length;i++){const cx=mapLogX(bands[i].fc,w); const y=mapLinearToYOct(peakOct[i]||0,h); if(i===0) ctxOct.moveTo(cx,y); else ctxOct.lineTo(cx,y);} ctxOct.save(); ctxOct.globalAlpha=.45; ctxOct.strokeStyle=HOLD_COLOR; ctxOct.lineWidth=1.5; ctxOct.stroke(); ctxOct.restore();
       let idxNow=0,vNow=-1; for(let i=0;i<vals.length;i++) if(vals[i]>vNow){vNow=vals[i];idxNow=i;}
-      drawPeakLine(ctxOct,mapLogX(bands[idxNow].fc,w),h,'rgba(96,165,250,.6)');
+      drawPeakLine(ctxOct,mapLogX(bands[idxNow].fc,w),h,'rgba(100,149,237,.6)');
       let idxHold=0,vHold=0; for(let i=0;i<peakOct.length;i++) if(peakOct[i]>vHold){vHold=peakOct[i];idxHold=i;}
-      if(vHold>0) drawPeakLine(ctxOct,mapLogX(bands[idxHold].fc,w),h,'rgba(250,204,21,.55)',true);
+      if(vHold>0) drawPeakLine(ctxOct,mapLogX(bands[idxHold].fc,w),h,'rgba(246,173,85,.55)',true);
       octPeakText.textContent=`Peak: ${fmtHz(bands[idxNow].fc)} • ${vNow.toFixed(1)} / ${octRangeMax}`;
       if(vHold>0){octHoldText.style.display=''; octHoldText.textContent=`Hold: ${fmtHz(bands[idxHold].fc)} • ${vHold.toFixed(1)} / ${octRangeMax}`;} else octHoldText.style.display='none';
       if(guideOCT) drawGuide(ctxOct,guideOCT.xPx,h);
     }
-
+    
     function drawOverlayMessage(ctx,w,h){ctx.fillStyle='rgba(255,255,255,.4)';ctx.font='24px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('Heatmap OFF',w/2,h/2);}
-    function drawHeatmapGuide(ctx,x,h){ctx.save();ctx.strokeStyle='rgba(96,165,250,.75)';ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h-PAD.B);ctx.stroke();ctx.restore();}
+    function drawHeatmapGuide(ctx,x,h){ctx.save();ctx.strokeStyle='rgba(100,149,237,.75)';ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h-PAD.B);ctx.stroke();ctx.restore();}
     function drawHeatmap(){
       const {width:w,height:h}=ctxHeatmap.canvas; const plotH=h-PAD.B; if(!freqArray||!heatmapFreqBinMap) return;
-      const frame=heatmapFreqBinMap.map(bin=>{
-        let sum=0,cnt=0; for(let j=bin.binStart;j<=bin.binEnd;j++){sum+=freqArray[j];cnt++;}
-        const avgDb=cnt>0?dbfs(sum/cnt):-100; // dBFS-ish
-        return {db:avgDb,fStart:bin.fStart,fEnd:bin.fEnd};
-      });
+      const frame=heatmapFreqBinMap.map(bin=>{let sum=0,cnt=0; for(let j=bin.binStart;j<=bin.binEnd;j++){sum+=freqArray[j];cnt++;} const avgDb=cnt>0?dbfs(sum/cnt):-100; return {db:avgDb,fStart:bin.fStart,fEnd:bin.fEnd};});
       heatmapData.unshift(frame); if(heatmapData.length>200) heatmapData.pop();
-
       const timeScale=plotH/200; ctxHeatmap.clearRect(0,0,w,h);
-      for(let i=0;i<heatmapData.length;i++){
-        const y=i*timeScale, row=heatmapData[i];
-        for(let j=0;j<row.length;j++){
-          const {fStart,fEnd,db}=row[j];
-          const xL=mapLogX(fStart,w), xR=mapLogX(fEnd,w);
-          ctxHeatmap.fillStyle = mapDbToColorScaled(db);
-          ctxHeatmap.fillRect(xL,y,Math.max(1,xR-xL),timeScale);
-        }
-      }
+      for(let i=0;i<heatmapData.length;i++){const y=i*timeScale, row=heatmapData[i]; for(let j=0;j<row.length;j++){const {fStart,fEnd,db}=row[j]; const xL=mapLogX(fStart,w), xR=mapLogX(fEnd,w); ctxHeatmap.fillStyle=mapDbToColorHeatmap(db); ctxHeatmap.fillRect(xL,y,Math.max(1,xR-xL),timeScale);}}
       ctxHeatmap.clearRect(0,plotH,w,PAD.B);
       ctxHeatmap.strokeStyle=GRID_V; [20,31.5,40,50,63,80,100,125,160,200,250,315,400,500,630,800,1000,2000,4000,8000,16000].forEach(t=>{const x=mapLogX(t,w);ctxHeatmap.beginPath();ctxHeatmap.moveTo(x,0);ctxHeatmap.lineTo(x,plotH);ctxHeatmap.stroke();});
-      ctxHeatmap.fillStyle=LABEL; ctxHeatmap.font='12px system-ui'; ctxHeatmap.textBaseline='alphabetic';
+      ctxHeatmap.fillStyle=LABEL; ctxHeatmap.font='12px system-ui';
+      ctxHeatmap.textBaseline='alphabetic';
       [31.5,63,125,250,500,1000,2000,4000,8000,16000].forEach(t=>{const x=mapLogX(t,w);ctxHeatmap.fillText(t>=1000?(t/1000)+'k':t,x-8,h-LABEL_Y);});
       if(guideHeatmap) drawHeatmapGuide(ctxHeatmap,guideHeatmap.xPx,h);
     }
@@ -534,9 +481,7 @@
       const dbAraw=calculateDba(), dbAdisp=Math.max(0,dbAraw); updateDbMeter(dbAdisp);
       if(dbaValues.length===0){ if(dbAdisp>0){dbaValues.push(dbAdisp); dbRealtimeValue.textContent=`${dbAdisp.toFixed(1)} dB-A`; dbAvgValue.textContent=dbMaxValue.textContent=`${dbAdisp.toFixed(1)} dB-A`; maxDba=dbAdisp;} else {dbRealtimeValue.textContent='—'; dbAvgValue.textContent='—'; dbMaxValue.textContent='—';}}
       else{ dbRealtimeValue.textContent=`${dbAdisp.toFixed(1)} dB-A`; if(dbAdisp>maxDba){maxDba=dbAdisp; dbMaxValue.textContent=`${maxDba.toFixed(1)} dB-A`;} if(dbAdisp>0){dbaValues.push(dbAdisp); if(dbaValues.length>100) dbaValues.shift();} const avg=dbaValues.reduce((a,b)=>a+b,0)/dbaValues.length; dbAvgValue.textContent=`${avg.toFixed(1)} dB-A`; }
-      const now=performance.now();
-      if(heatmapEnabled && (now-lastHeatmapUpdate>=HEATMAP_UPDATE_MS)){drawHeatmap(); lastHeatmapUpdate=now;}
-      else if(!heatmapEnabled){ctxHeatmap.clearRect(0,0,heatmapCanvas.width,heatmapCanvas.height); drawHeatmapBackground(ctxHeatmap); drawOverlayMessage(ctxHeatmap,heatmapCanvas.width,heatmapCanvas.height);}
+      const now=performance.now(); if(heatmapEnabled && (now-lastHeatmapUpdate>=HEATMAP_UPDATE_MS)){drawHeatmap(); lastHeatmapUpdate=now;} else if(!heatmapEnabled){ctxHeatmap.clearRect(0,0,heatmapCanvas.width,heatmapCanvas.height); drawHeatmapBackground(ctxHeatmap); drawOverlayMessage(ctxHeatmap,heatmapCanvas.width,heatmapCanvas.height);}
       rafId=requestAnimationFrame(loop);
     }
 
@@ -572,7 +517,7 @@
     function attachPressGuide(canvas,tipEl,which){
       let pressed=false;
       const getX=(e)=>{const r=canvas.getBoundingClientRect(); const xCss=(e.touches?e.touches[0].clientX:e.clientX)-r.left; return Math.max(PAD.L,Math.min(canvas.width-PAD.R,xCss*(canvas.width/r.width)));};
-      const update=(xPx)=>{const freq=xToFreq(xPx,canvas.width); const plot=canvas.parentElement.getBoundingClientRect(); tipEl.style.display='block'; tipEl.textContent=fmtHz(freq); const cssX=(xPx/canvas.width)*plot.width; tipEl.style.left=cssX+'px'; tipEl.style.top='8px'; if(which==='fft') guideFFT={xPx,freq}; else if(which==='oct') guideOCT={xPx,freq}; else if(which==='heatmap'){guideHeatmap={xPx,freq}; const w=heatmapCanvas.width,h=heatmapCanvas.height; ctxHeatmap.clearRect(0,0,w,h); if(heatmapEnabled) drawHeatmap(); else {drawHeatmapBackground(ctxHeatmap); drawOverlayMessage(ctxHeatmap,w,h);} drawHeatmapGuide(ctxHeatmap,guideHeatmap.xPx,h);} };
+      const update=(xPx)=>{const freq=xToFreq(xPx,canvas.width); const plot=canvas.parentElement.getBoundingClientRect(); tipEl.style.display='block'; tipEl.textContent=fmtHz(freq); const cssX=(xPx/canvas.width)*plot.width; tipEl.style.left=cssX+'px'; tipEl.style.top='8px'; if(which==='fft') guideFFT={xPx,freq}; else if(which==='oct') guideOCT={xPx,freq}; else if(which==='heatmap'){guideHeatmap={xPx,freq}; const w=heatmapCanvas.width,h=heatmapCanvas.height; ctxHeatmap.clearRect(0,0,w,h); if(heatmapEnabled) drawHeatmap(); else {drawHeatmapBackground(ctxHeatmap); drawOverlayMessage(ctxHeatmap,w,h);} drawHeatmapGuide(ctxHeatmap,guideHeatmap.xPx,h);}};
       const clear=()=>{pressed=false; tipEl.style.display='none'; if(which==='fft') guideFFT=null; else if(which==='oct') guideOCT=null; else if(which==='heatmap'){guideHeatmap=null; if(heatmapEnabled) drawHeatmap(); else {const w=heatmapCanvas.width,h=heatmapCanvas.height; ctxHeatmap.clearRect(0,0,w,h); drawHeatmapBackground(ctxHeatmap); drawOverlayMessage(ctxHeatmap,w,h);}}};
       const onDown=(e)=>{pressed=true; e.preventDefault(); update(getX(e));};
       const onMove=(e)=>{if(!pressed) return; e.preventDefault(); update(getX(e));};
@@ -580,62 +525,117 @@
       canvas.addEventListener('mousedown',onDown); canvas.addEventListener('mousemove',onMove); canvas.addEventListener('mouseup',onUp); canvas.addEventListener('mouseleave',onUp);
       canvas.addEventListener('touchstart',onDown,{passive:false}); canvas.addEventListener('touchmove',onMove,{passive:false}); canvas.addEventListener('touchend',onUp);
     }
-    function drawHeatmapBackground(ctx){const {width:w,height:h}=ctx.canvas; const plotH=h-PAD.B; ctx.clearRect(0,0,w,h); ctx.strokeStyle=FRAME; ctx.strokeRect(PAD.L,0,w-PAD.L-PAD.R,plotH); ctx.fillStyle=LABEL; ctx.font='12px system-ui'; ctx.textBaseline='alphabetic'; [31.5,63,125,250,500,1000,2000,4000,8000,16000].forEach(t=>{const x=mapLogX(t,w); ctx.fillText(t>=1000?(t/1000)+'k':t,x-8,h-LABEL_Y);});}
 
-    btnStart.onclick=start;
-    btnStop.onclick=stop;
-    btnHold.onclick=()=>{holdEnabled=!holdEnabled; btnHold.setAttribute('aria-pressed',holdEnabled); btnHold.textContent=`📌 Hold Peak: ${holdEnabled?'ON':'OFF'}`;};
-    btnClear.onclick=()=>{if(peakArray) peakArray.fill(0); if(peakOct) peakOct.fill(0); if(running){drawFFT(); drawOctave();}};
-    btnToggleHeatmap.onclick=()=>{heatmapEnabled=!heatmapEnabled; btnToggleHeatmap.setAttribute('aria-pressed',heatmapEnabled); btnToggleHeatmap.textContent=`🔥 Heatmap: ${heatmapEnabled?'ON':'OFF'}`; const w=heatmapCanvas.width,h=heatmapCanvas.height; if(running){ if(heatmapEnabled){heatmapData=[]; lastHeatmapUpdate=0;} drawHeatmap(); } else {ctxHeatmap.clearRect(0,0,w,h); drawHeatmapBackground(ctxHeatmap); if(!heatmapEnabled) drawOverlayMessage(ctxHeatmap,w,h);} };
-
-    // NEW: color mapping mode cycler
-    btnColorMode.onclick=()=>{
-      heatColorMode = heatColorMode==='linear' ? 'log' : heatColorMode==='log' ? 'sigmoid' : 'linear';
-      const label = heatColorMode.charAt(0).toUpperCase()+heatColorMode.slice(1);
-      btnColorMode.textContent = `🎨 Color: ${label}`;
-      if(heatmapEnabled){
-        drawHeatmap();
-      }else{
-        const w=heatmapCanvas.width,h=heatmapCanvas.height;
-        ctxHeatmap.clearRect(0,0,w,h); drawHeatmapBackground(ctxHeatmap); drawOverlayMessage(ctxHeatmap,w,h);
-      }
-    };
-
-    fftSel.onchange=()=>{ if(analyser){stop(); start();} };
-    smoothing.oninput=()=>{ if(analyser) analyser.smoothingTimeConstant=parseFloat(smoothing.value); };
-
-    // Octave res
-    octResSel.onchange=()=>{octN=parseInt(octResSel.value,10); bands=genBands(octN); peakOct=new Float32Array(bands.length); drawOctave();};
-
-    // Dynamic Range controls (Octave)
-    function applyOctRange(newMax){
-      octRangeMax=Math.max(1,parseInt(newMax,10)||255);
-      octRangeSlider.value=String(octRangeMax);
-      octRangePreset.value=String([127,255,511].includes(octRangeMax)?octRangeMax:255);
-      octRangeText.textContent=`0–${octRangeMax}`;
-      if(peakOct) peakOct.fill(0); // รีเซ็ต hold ให้เข้ากับสเกลใหม่
-      drawOctave();
+    function drawHeatmapBackground(ctx){
+      const {width:w,height:h}=ctx.canvas;
+      const plotH=h-PAD.B;
+      ctx.clearRect(0,0,w,h);
+      ctx.strokeStyle=FRAME;
+      ctx.strokeRect(PAD.L,0,w-PAD.L-PAD.R,plotH);
+      ctx.fillStyle=LABEL;
+      ctx.font='12px system-ui';
+      ctx.textBaseline='alphabetic';
+      [31.5,63,125,250,500,1000,2000,4000,8000,16000].forEach(t=>{
+        const x=mapLogX(t,w);
+        ctx.fillText(t>=1000?(t/1000)+'k':t,x-8,h-LABEL_Y);
+      });
     }
-    octRangePreset.onchange=()=>applyOctRange(octRangePreset.value);
-    octRangeSlider.oninput=()=>applyOctRange(octRangeSlider.value);
 
-    calibrationInput.onchange=()=>{calibrationOffset=parseFloat(calibrationInput.value)||0;};
-    btnResetDba.onclick=resetDbaValues;
+    function updateHeatmapRangeText(){
+      heatmapRangeText.textContent = `0 to -${heatmapRangeMax} dBFS`;
+    }
 
-    attachPressGuide(fftCanvas,fftTip,'fft');
-    attachPressGuide(octCanvas,octTip,'oct');
-    attachPressGuide(heatmapCanvas,heatmapTip,'heatmap');
+    // Event listeners
+    btnStart.addEventListener('click', start);
+    btnStop.addEventListener('click', stop);
+    btnHold.addEventListener('click', ()=>{
+      holdEnabled=!holdEnabled;
+      btnHold.setAttribute('aria-pressed', holdEnabled);
+      btnHold.textContent=`📌 Hold Peak: ${holdEnabled?'ON':'OFF'}`;
+    });
+    btnClear.addEventListener('click', ()=>{
+      peakArray=null;
+      peakOct=null;
+    });
+    btnToggleHeatmap.addEventListener('click', ()=>{
+      heatmapEnabled=!heatmapEnabled;
+      btnToggleHeatmap.setAttribute('aria-pressed', heatmapEnabled);
+      btnToggleHeatmap.textContent=`🔥 Heatmap: ${heatmapEnabled?'ON':'OFF'}`;
+      if(!heatmapEnabled){
+        ctxHeatmap.clearRect(0,0,heatmapCanvas.width,heatmapCanvas.height);
+        drawHeatmapBackground(ctxHeatmap);
+        drawOverlayMessage(ctxHeatmap,heatmapCanvas.width,heatmapCanvas.height);
+      }
+    });
+    btnResetDba.addEventListener('click', resetDbaValues);
 
-    // initial paints
+    fftSel.addEventListener('change', ()=>{
+      if(analyser) analyser.fftSize=parseInt(fftSel.value,10);
+      dataArray=new Uint8Array(analyser.fftSize);
+      freqArray=new Uint8Array(analyser.frequencyBinCount);
+      peakArray=new Uint8Array(analyser.frequencyBinCount);
+      heatmapFreqBinMap=genHeatmapBins();
+      heatmapData=[];
+    });
+    smoothing.addEventListener('input', ()=>{
+      if(analyser) analyser.smoothingTimeConstant=parseFloat(smoothing.value);
+    });
+
+    octResSel.addEventListener('change', ()=>{
+      octN=parseInt(octResSel.value,10);
+      bands=genBands(octN);
+      peakOct=new Float32Array(bands.length);
+    });
+    octRangePreset.addEventListener('change', ()=>{
+      octRangeMax=parseInt(octRangePreset.value,10);
+      octRangeSlider.value=octRangeMax;
+      octRangeText.textContent=`0–${octRangeMax}`;
+    });
+    octRangeSlider.addEventListener('input', ()=>{
+      octRangeMax=parseInt(octRangeSlider.value,10);
+      octRangeText.textContent=`0–${octRangeMax}`;
+    });
+
+    // New: Heatmap range controls
+    heatmapRangePreset.addEventListener('change', () => {
+      heatmapRangeMax = parseInt(heatmapRangePreset.value, 10);
+      heatmapRangeSlider.value = heatmapRangeMax;
+      updateHeatmapRangeText();
+    });
+    heatmapRangeSlider.addEventListener('input', () => {
+      heatmapRangeMax = parseInt(heatmapRangeSlider.value, 10);
+      updateHeatmapRangeText();
+    });
+
+
+    calibrationInput.addEventListener('input', ()=>{
+      calibrationOffset=parseFloat(calibrationInput.value);
+    });
+
+    // DSP controls (if running, restart)
+    [ec, ns, agc].forEach(el => {
+      el.addEventListener('change', () => {
+        if (running) {
+          stop();
+          // Give it a moment to clear the audio context
+          setTimeout(start, 50);
+        }
+      });
+    });
+    
+    // Initial draw
     drawBackground(ctxFFT);
     drawBackground(ctxOct);
     drawHeatmapBackground(ctxHeatmap);
-    drawOverlayMessage(ctxHeatmap,heatmapCanvas.width,heatmapCanvas.height);
-    (function initDb(){const {width:w,height:h}=ctxDbMeter.canvas; ctxDbMeter.clearRect(0,0,w,h);})();
+    drawDbMeterBackground(ctxDbMeter);
 
-    // sync UI ครั้งแรก
-    applyOctRange(octRangePreset.value);
+    // Initial text update for heatmap range
+    updateHeatmapRangeText();
 
+    // Add interactive guides
+    attachPressGuide(fftCanvas, fftTip, 'fft');
+    attachPressGuide(octCanvas, octTip, 'oct');
+    attachPressGuide(heatmapCanvas, heatmapTip, 'heatmap');
   })();
   </script>
 </body>
