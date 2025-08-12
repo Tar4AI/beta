@@ -18,8 +18,6 @@
       --heatmap-color-1:#1a202c; --heatmap-color-2:#4a5568; --heatmap-color-3:#68d391;
       --heatmap-color-4:#f6ad55; --heatmap-color-5:#e53e3e;
       --dba-meter-bg-0-50:#48bb78; --dba-meter-bg-50-70:#f6ad55; --dba-meter-bg-70-90:#e53e3e; --dba-meter-bg-90-140:#c53030;
-      /* ความกว้างสไลด์เรนจ์ (ย่อได้ที่นี่) */
-      --oct-range-slider-width: 180px;
     }
     :root{ color-scheme:dark }
     html{ background:#1a202c }
@@ -68,17 +66,6 @@
     .dba-values-row{display:flex;justify-content:space-between;gap:8px}
     .dba-values-row .kv-item{flex:1;background:#2d3748;border:1px solid #4a5568;border-radius:12px;padding:8px;text-align:center}
     .dba-values-row .kv-item b{display:block;color:#cbd5e1;font-size:12px;margin-bottom:4px}
-
-    /* ===== Inline compact octave range slider ===== */
-    .oct-head{display:flex;align-items:center;gap:10px;justify-content:space-between}
-    .oct-left{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
-    #octRangeSlider{
-      width:var(--oct-range-slider-width);
-      height:4px;
-    }
-    @media (max-width:560px){
-      #octRangeSlider{ width:140px }
-    }
   </style>
 </head>
 <body>
@@ -144,12 +131,19 @@
       </div>
 
       <div class="card">
-        <!-- Header row: Title | [slider] | [22 Hz – … + dropdowns] -->
-        <div class="oct-head" style="margin-bottom:2px">
-          <div class="oct-left">
-            <b id="octTitle">RTA แบบ 1/6 Octave (Linear Axis)</b>
-            <!-- สไลด์เรนจ์แบบสั้น อยู่คั่นระหว่างชื่อกับข้อความช่วงความถี่ -->
-            <input id="octRangeSlider" type="range" min="64" max="1023" step="1" value="255" aria-label="Octave bar range">
+        <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:2px">
+          <b id="octTitle">RTA แบบ 1/6 Octave (Linear Axis)</b>
+          <!-- New: Octave Range Control (Styled to match Heatmap) -->
+          <div class="row">
+            <label style="display:flex;align-items:center;gap:6px">Range (dbFS)
+              <input id="octRangeSlider" type="range" min="64" max="1023" step="1" value="255" aria-label="Octave bar range">
+              <select id="octRangePreset">
+                <option value="127">0–127</option>
+                <option value="255" selected>0–255</option>
+                <option value="511">0–511</option>
+              </select>
+            </label>
+            <span class="hint" id="octRangeText">0–255</span>
           </div>
           <span class="row" style="gap:10px;align-items:center">
             <span class="hint" id="labelOct">20 Hz – 20 kHz</span>
@@ -159,14 +153,6 @@
                 <option value="6" selected>1/6</option>
               </select>
             </label>
-            <label>Range
-              <select id="octRangePreset">
-                <option value="127">0–127</option>
-                <option value="255" selected>0–255</option>
-                <option value="511">0–511</option>
-              </select>
-            </label>
-            <span class="hint" id="octRangeText">0–255</span>
           </span>
         </div>
 
@@ -295,7 +281,7 @@
     const octRangeSlider=document.getElementById('octRangeSlider');
     const octRangeText=document.getElementById('octRangeText');
 
-    // New: Heatmap range slider elements
+    // Heatmap range slider elements
     const heatmapRangeSlider=document.getElementById('heatmapRangeSlider');
     const heatmapRangePreset=document.getElementById('heatmapRangePreset');
     const heatmapRangeText=document.getElementById('heatmapRangeText');
@@ -344,7 +330,6 @@
     function mapDbToY(db,h){const norm=clamp01((db+100)/100);const plotH=h-PAD.T-PAD.B;return PAD.T+(1-norm)*plotH;}
     function mapLinearToYOct(v,h){const norm=clamp01(v/Math.max(1,octRangeMax));const plotH=h-PAD.T-PAD.B;return PAD.T+(1-norm)*plotH;}
     
-    // New: color mapping for heatmap using dynamic range
     function mapDbToColorHeatmap(db) {
       const maxDb = 0;
       const minDb = maxDb - heatmapRangeMax;
@@ -544,6 +529,10 @@
     function updateHeatmapRangeText(){
       heatmapRangeText.textContent = `0 to -${heatmapRangeMax} dBFS`;
     }
+    
+    function updateOctaveRangeText(){
+      octRangeText.textContent = `0–${octRangeMax}`;
+    }
 
     // Event listeners
     btnStart.addEventListener('click', start);
@@ -589,11 +578,11 @@
     octRangePreset.addEventListener('change', ()=>{
       octRangeMax=parseInt(octRangePreset.value,10);
       octRangeSlider.value=octRangeMax;
-      octRangeText.textContent=`0–${octRangeMax}`;
+      updateOctaveRangeText();
     });
     octRangeSlider.addEventListener('input', ()=>{
       octRangeMax=parseInt(octRangeSlider.value,10);
-      octRangeText.textContent=`0–${octRangeMax}`;
+      updateOctaveRangeText();
     });
 
     // New: Heatmap range controls
@@ -629,8 +618,9 @@
     drawHeatmapBackground(ctxHeatmap);
     drawDbMeterBackground(ctxDbMeter);
 
-    // Initial text update for heatmap range
+    // Initial text update for ranges
     updateHeatmapRangeText();
+    updateOctaveRangeText();
 
     // Add interactive guides
     attachPressGuide(fftCanvas, fftTip, 'fft');
