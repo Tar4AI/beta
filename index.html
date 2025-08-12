@@ -1,4 +1,3 @@
-ทำเวอร์ชั่นอัพเกรดการแก้ปัญา ตามที่คุณบอกมา โดยต่อยอดจาก โค๊ดเดิม  แบบที่ผมก็อบไปวางใน GH ได้เลย
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -16,9 +15,16 @@
       --gridH:rgba(255,255,255,.06); --gridV:rgba(255,255,255,.035);
       --frame:rgba(255,255,255,.08); --label:rgba(255,255,255,.55);
       --fft:#34d399; --peak:#a78bfa; --hold:#facc15; --bar:#34d399;
-      --heatmap-color-1:#0b1220; --heatmap-color-2:#3b82f6; --heatmap-color-3:#22c55e;
-      --heatmap-color-4:#facc15; --heatmap-color-5:#ef4444;
+
+      /* heatmap palette (5 stops) */
+      --heatmap-color-1:#0b1220;
+      --heatmap-color-2:#3b82f6;
+      --heatmap-color-3:#22c55e;
+      --heatmap-color-4:#facc15;
+      --heatmap-color-5:#ef4444;
+
       --dba-meter-bg-0-50:#22c55e; --dba-meter-bg-50-70:#facc15; --dba-meter-bg-70-90:#ef4444; --dba-meter-bg-90-140:#be123c;
+
       /* ความกว้างสไลด์เรนจ์ (ย่อได้ที่นี่) */
       --oct-range-slider-width: 180px;
     }
@@ -184,7 +190,11 @@
       <div class="card" id="heatmapCard">
         <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:2px">
           <b>Spectrogram / Heatmap</b>
-          <button id="btnToggleHeatmap" class="ghost" aria-pressed="true">🔥 Heatmap: ON</button>
+          <div class="row">
+            <button id="btnToggleHeatmap" class="ghost" aria-pressed="true">🔥 Heatmap: ON</button>
+            <!-- NEW: toggle color mapping mode -->
+            <button id="btnColorMode" class="ghost" aria-pressed="false">🎨 Color: Linear</button>
+          </div>
         </div>
         <div class="plot">
           <canvas id="heatmapCanvas" width="1200" height="320"></canvas>
@@ -233,6 +243,10 @@
     const PAD={L:40,R:10,T:10,B:32}, LABEL_Y=10;
     const HEATMAP_UPDATE_MS=33, HEATMAP_FREQ_BINS=300;
 
+    // dB range used to normalize heatmap (tune ifต้องการ)
+    const HEATMAP_DB_MIN = -90;  // floor dBFS
+    const HEATMAP_DB_MAX = -10;  // ceiling dBFS
+
     const getStyle=(p)=>getComputedStyle(document.documentElement).getPropertyValue(p).trim();
     const GRID_H=getStyle('--gridH'), GRID_V=getStyle('--gridV');
     const FRAME=getStyle('--frame'), LABEL=getStyle('--label');
@@ -250,6 +264,7 @@
     const btnHold=document.getElementById('btnHold');
     const btnClear=document.getElementById('btnClear');
     const btnToggleHeatmap=document.getElementById('btnToggleHeatmap');
+    const btnColorMode=document.getElementById('btnColorMode');
     const btnResetDba=document.getElementById('btnResetDba');
 
     const fftSel=document.getElementById('fft');
@@ -288,6 +303,7 @@
 
     const ctxFFT=fftCanvas.getContext('2d');
     const ctxOct=octCanvas.getContext('2d');
+    theatmap = heatmapCanvas.getContext ? heatmapCanvas : null;
     const ctxHeatmap=heatmapCanvas.getContext('2d');
     const ctxDbMeter=dbMeterCanvas.getContext('2d');
 
@@ -315,8 +331,11 @@
     let maxDba=-Infinity;
     let dbaValues=[];
 
-    // Dynamic range
+    // Dynamic range (Octave bars)
     let octRangeMax=parseInt(octRangePreset.value,10);
+
+    // Heatmap color mapping mode: 'linear' | 'log' | 'sigmoid'
+    let heatColorMode='linear';
 
     // ===== Freq helpers =====
     const fmax=()=>Math.min(sampleRate/2,20000);
@@ -325,7 +344,58 @@
     function xToFreq(x,w){const fm=fmax();const plotW=w-PAD.L-PAD.R;const t=clamp01((x-PAD.L)/plotW);const lf=Math.log10(fmin)+t*(Math.log10(fm)-Math.log10(fmin));return Math.pow(10,lf);}
     function mapDbToY(db,h){const norm=clamp01((db+100)/100);const plotH=h-PAD.T-PAD.B;return PAD.T+(1-norm)*plotH;}
     function mapLinearToYOct(v,h){const norm=clamp01(v/Math.max(1,octRangeMax));const plotH=h-PAD.T-PAD.B;return PAD.T+(1-norm)*plotH;}
-    function mapDbToColor(db){if(db<-60)return getStyle('--heatmap-color-1');if(db<-40)return getStyle('--heatmap-color-2');if(db<-20)return getStyle('--heatmap-color-3');if(db<-5)return getStyle('--heatmap-color-4');return getStyle('--heatmap-color-5');}
+
+    // ===== Heatmap color utilities =====
+    function hexToRgb(hex){
+      let h = hex.replace('#','').trim();
+      if(h.length===3) h = h.split('').map(c=>c+c).join('');
+      const n = parseInt(h,16);
+      return {r:(n>>16)&255, g:(n>>8)&255, b:n&255};
+    }
+    const CM_STOPS = [
+      hexToRgb(getStyle('--heatmap-color-1')),
+      hexToRgb(getStyle('--heatmap-color-2')),
+      hexToRgb(getStyle('--heatmap-color-3')),
+      hexToRgb(getStyle('--heatmap-color-4')),
+      hexToRgb(getStyle('--heatmap-color-5')),
+    ];
+    function lerp(a,b,t){return a+(b-a)*t;}
+    function lerpColor(c1,c2,t){
+      return `rgb(${Math.round(lerp(c1.r,c2.r,t))},${Math.round(lerp(c1.g,c2.g,t))},${Math.round(lerp(c1.b,c2.b,t))})`;
+    }
+    function normalizeDb(db){
+      // clamp & normalize to 0..1
+      const x = (db - HEATMAP_DB_MIN) / (HEATMAP_DB_MAX - HEATMAP_DB_MIN);
+      return clamp01(x);
+    }
+    function shapeNorm(t, mode){
+      t = clamp01(t);
+      if(mode==='linear') return t;
+      if(mode==='log'){ // emphasize quieter → spread mid
+        const k = 9; // bigger = stronger log
+        return Math.log10(1 + k*t) / Math.log10(1 + k);
+      }
+      if(mode==='sigmoid'){ // compress extremes, highlight center
+        const k = 8; // slope
+        const s = 1/(1+Math.exp(-k*(t-0.5)));
+        const sMin = 1/(1+Math.exp(+k*0.5));
+        const sMax = 1/(1+Math.exp(-k*0.5));
+        return (s - sMin) / (sMax - sMin);
+      }
+      return t;
+    }
+    function colorFromStops(t){
+      const n = CM_STOPS.length - 1;
+      const p = t * n;
+      const i = Math.min(n-1, Math.max(0, Math.floor(p)));
+      const f = p - i;
+      return lerpColor(CM_STOPS[i], CM_STOPS[i+1], f);
+    }
+    function mapDbToColorScaled(db){
+      const t = normalizeDb(db);
+      const shaped = shapeNorm(t, heatColorMode);
+      return colorFromStops(shaped);
+    }
 
     function genBands(n){
       const r=Math.pow(2,1/n), fm=fmax();
@@ -421,10 +491,23 @@
     function drawHeatmapGuide(ctx,x,h){ctx.save();ctx.strokeStyle='rgba(96,165,250,.75)';ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h-PAD.B);ctx.stroke();ctx.restore();}
     function drawHeatmap(){
       const {width:w,height:h}=ctxHeatmap.canvas; const plotH=h-PAD.B; if(!freqArray||!heatmapFreqBinMap) return;
-      const frame=heatmapFreqBinMap.map(bin=>{let sum=0,cnt=0; for(let j=bin.binStart;j<=bin.binEnd;j++){sum+=freqArray[j];cnt++;} const avgDb=cnt>0?dbfs(sum/cnt):-100; return {db:avgDb,fStart:bin.fStart,fEnd:bin.fEnd};});
+      const frame=heatmapFreqBinMap.map(bin=>{
+        let sum=0,cnt=0; for(let j=bin.binStart;j<=bin.binEnd;j++){sum+=freqArray[j];cnt++;}
+        const avgDb=cnt>0?dbfs(sum/cnt):-100; // dBFS-ish
+        return {db:avgDb,fStart:bin.fStart,fEnd:bin.fEnd};
+      });
       heatmapData.unshift(frame); if(heatmapData.length>200) heatmapData.pop();
+
       const timeScale=plotH/200; ctxHeatmap.clearRect(0,0,w,h);
-      for(let i=0;i<heatmapData.length;i++){const y=i*timeScale, row=heatmapData[i]; for(let j=0;j<row.length;j++){const {fStart,fEnd,db}=row[j]; const xL=mapLogX(fStart,w), xR=mapLogX(fEnd,w); ctxHeatmap.fillStyle=mapDbToColor(db); ctxHeatmap.fillRect(xL,y,Math.max(1,xR-xL),timeScale);}}
+      for(let i=0;i<heatmapData.length;i++){
+        const y=i*timeScale, row=heatmapData[i];
+        for(let j=0;j<row.length;j++){
+          const {fStart,fEnd,db}=row[j];
+          const xL=mapLogX(fStart,w), xR=mapLogX(fEnd,w);
+          ctxHeatmap.fillStyle = mapDbToColorScaled(db);
+          ctxHeatmap.fillRect(xL,y,Math.max(1,xR-xL),timeScale);
+        }
+      }
       ctxHeatmap.clearRect(0,plotH,w,PAD.B);
       ctxHeatmap.strokeStyle=GRID_V; [20,31.5,40,50,63,80,100,125,160,200,250,315,400,500,630,800,1000,2000,4000,8000,16000].forEach(t=>{const x=mapLogX(t,w);ctxHeatmap.beginPath();ctxHeatmap.moveTo(x,0);ctxHeatmap.lineTo(x,plotH);ctxHeatmap.stroke();});
       ctxHeatmap.fillStyle=LABEL; ctxHeatmap.font='12px system-ui'; ctxHeatmap.textBaseline='alphabetic';
@@ -451,7 +534,9 @@
       const dbAraw=calculateDba(), dbAdisp=Math.max(0,dbAraw); updateDbMeter(dbAdisp);
       if(dbaValues.length===0){ if(dbAdisp>0){dbaValues.push(dbAdisp); dbRealtimeValue.textContent=`${dbAdisp.toFixed(1)} dB-A`; dbAvgValue.textContent=dbMaxValue.textContent=`${dbAdisp.toFixed(1)} dB-A`; maxDba=dbAdisp;} else {dbRealtimeValue.textContent='—'; dbAvgValue.textContent='—'; dbMaxValue.textContent='—';}}
       else{ dbRealtimeValue.textContent=`${dbAdisp.toFixed(1)} dB-A`; if(dbAdisp>maxDba){maxDba=dbAdisp; dbMaxValue.textContent=`${maxDba.toFixed(1)} dB-A`;} if(dbAdisp>0){dbaValues.push(dbAdisp); if(dbaValues.length>100) dbaValues.shift();} const avg=dbaValues.reduce((a,b)=>a+b,0)/dbaValues.length; dbAvgValue.textContent=`${avg.toFixed(1)} dB-A`; }
-      const now=performance.now(); if(heatmapEnabled && (now-lastHeatmapUpdate>=HEATMAP_UPDATE_MS)){drawHeatmap(); lastHeatmapUpdate=now;} else if(!heatmapEnabled){ctxHeatmap.clearRect(0,0,heatmapCanvas.width,heatmapCanvas.height); drawHeatmapBackground(ctxHeatmap); drawOverlayMessage(ctxHeatmap,heatmapCanvas.width,heatmapCanvas.height);}
+      const now=performance.now();
+      if(heatmapEnabled && (now-lastHeatmapUpdate>=HEATMAP_UPDATE_MS)){drawHeatmap(); lastHeatmapUpdate=now;}
+      else if(!heatmapEnabled){ctxHeatmap.clearRect(0,0,heatmapCanvas.width,heatmapCanvas.height); drawHeatmapBackground(ctxHeatmap); drawOverlayMessage(ctxHeatmap,heatmapCanvas.width,heatmapCanvas.height);}
       rafId=requestAnimationFrame(loop);
     }
 
@@ -503,13 +588,26 @@
     btnClear.onclick=()=>{if(peakArray) peakArray.fill(0); if(peakOct) peakOct.fill(0); if(running){drawFFT(); drawOctave();}};
     btnToggleHeatmap.onclick=()=>{heatmapEnabled=!heatmapEnabled; btnToggleHeatmap.setAttribute('aria-pressed',heatmapEnabled); btnToggleHeatmap.textContent=`🔥 Heatmap: ${heatmapEnabled?'ON':'OFF'}`; const w=heatmapCanvas.width,h=heatmapCanvas.height; if(running){ if(heatmapEnabled){heatmapData=[]; lastHeatmapUpdate=0;} drawHeatmap(); } else {ctxHeatmap.clearRect(0,0,w,h); drawHeatmapBackground(ctxHeatmap); if(!heatmapEnabled) drawOverlayMessage(ctxHeatmap,w,h);} };
 
+    // NEW: color mapping mode cycler
+    btnColorMode.onclick=()=>{
+      heatColorMode = heatColorMode==='linear' ? 'log' : heatColorMode==='log' ? 'sigmoid' : 'linear';
+      const label = heatColorMode.charAt(0).toUpperCase()+heatColorMode.slice(1);
+      btnColorMode.textContent = `🎨 Color: ${label}`;
+      if(heatmapEnabled){
+        drawHeatmap();
+      }else{
+        const w=heatmapCanvas.width,h=heatmapCanvas.height;
+        ctxHeatmap.clearRect(0,0,w,h); drawHeatmapBackground(ctxHeatmap); drawOverlayMessage(ctxHeatmap,w,h);
+      }
+    };
+
     fftSel.onchange=()=>{ if(analyser){stop(); start();} };
     smoothing.oninput=()=>{ if(analyser) analyser.smoothingTimeConstant=parseFloat(smoothing.value); };
 
     // Octave res
     octResSel.onchange=()=>{octN=parseInt(octResSel.value,10); bands=genBands(octN); peakOct=new Float32Array(bands.length); drawOctave();};
 
-    // Dynamic Range controls
+    // Dynamic Range controls (Octave)
     function applyOctRange(newMax){
       octRangeMax=Math.max(1,parseInt(newMax,10)||255);
       octRangeSlider.value=String(octRangeMax);
