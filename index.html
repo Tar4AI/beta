@@ -28,6 +28,7 @@
       -webkit-touch-callout:none; -webkit-user-select:none; user-select:none;
       overscroll-behavior:contain;
     }
+    /* safe-area */
     body::before, body::after{content:"";position:fixed;left:0;right:0;z-index:9999;background:#0a1120;pointer-events:none}
     body::before{top:0;height:env(safe-area-inset-top)} body::after{bottom:0;height:env(safe-area-inset-bottom)}
     @supports (padding: env(safe-area-inset-left)) {
@@ -65,6 +66,10 @@
     .dba-values-row{display:flex;justify-content:space-between;gap:8px}
     .dba-values-row .kv-item{flex:1;background:#0e1628;border:1px solid #1f2937;border-radius:12px;padding:8px;text-align:center}
     .dba-values-row .kv-item b{display:block;color:#cbd5e1;font-size:12px;margin-bottom:4px}
+
+    /* สไลด์เรนจ์ */
+    .range-wrap{display:flex;justify-content:center;margin:6px 0 2px}
+    #octRangeSlider{width:320px}
   </style>
 </head>
 <body>
@@ -140,16 +145,23 @@
                 <option value="6" selected>1/6</option>
               </select>
             </label>
-            <!-- ใหม่: เลือกเรนจ์ค่าสูงสุดสำหรับบาร์ Octave -->
+            <!-- ใหม่: preset เรนจ์ + แสดงค่า -->
             <label>Range
-              <select id="octRange">
+              <select id="octRangePreset">
                 <option value="127">0–127</option>
                 <option value="255" selected>0–255</option>
                 <option value="511">0–511</option>
               </select>
             </label>
+            <span class="hint" id="octRangeText">0–255</span>
           </span>
         </div>
+
+        <!-- สไลด์เรนจ์แบบไดนามิก -->
+        <div class="range-wrap">
+          <input id="octRangeSlider" type="range" min="64" max="1023" step="1" value="255">
+        </div>
+
         <div class="badges">
           <span class="badge" id="octPeakText">Peak: —</span>
           <span class="badge" id="octHoldText" style="display:none;">Hold: —</span>
@@ -257,7 +269,12 @@
     const labelOct = document.getElementById('labelOct');
     const octTitle = document.getElementById('octTitle');
     const octResSel = document.getElementById('octRes');
-    const octRangeSel = document.getElementById('octRange');
+
+    // ใหม่: preset + slider + label
+    const octRangePreset = document.getElementById('octRangePreset');
+    const octRangeSlider = document.getElementById('octRangeSlider');
+    const octRangeText = document.getElementById('octRangeText');
+
     const rmsEl = document.getElementById('rms');
     const peakEl = document.getElementById('peak');
 
@@ -291,7 +308,7 @@
     let dbaValues = [];
 
     // NEW: dynamic range for octave bars
-    let octRangeMax = parseInt(octRangeSel.value, 10); // 127 | 255 | 511
+    let octRangeMax = parseInt(octRangePreset.value, 10); // synced with slider
 
     // ====== Frequency helpers ======
     const fmax = () => Math.min(sampleRate / 2, 20000);
@@ -312,8 +329,9 @@
       const plotH=h-PAD.T-PAD.B;
       return PAD.T + (1-norm)*plotH;
     }
+    // ใช้สำหรับกราฟ Octave: สเกลตามเรนจ์ที่เลือก/สไลด์
     function mapLinearToYOct(value, h){
-      const norm=clamp01(value / octRangeMax);
+      const norm=clamp01(value / Math.max(1, octRangeMax));
       const plotH=h-PAD.T-PAD.B;
       return PAD.T + (1-norm)*plotH;
     }
@@ -355,8 +373,8 @@
         const logFStart = logFmin + (i/HEATMAP_FREQ_BINS)*(logFmax-logFmin);
         const logFEnd   = logFmin + ((i+1)/HEATMAP_FREQ_BINS)*(logFmax-logFmin);
         const fStart=Math.pow(10,logFStart), fEnd=Math.pow(10,logFEnd);
-        const binStart=Math.max(0,Math.floor(fStart/(sampleRate/analyser.fftSize)));
-        const binEnd=Math.min(analyser.frequencyBinCount-1,Math.ceil(fEnd/(sampleRate/analyser.fftSize)));
+        const binStart=Math.max(0,Math.floor(fStart/fpb));
+        const binEnd=Math.min(analyser.frequencyBinCount-1,Math.ceil(fEnd/fpb));
         bins.push({binStart,binEnd,fStart,fEnd});
       }
       return bins;
@@ -709,8 +727,20 @@
     fftSel.onchange = ()=>{ if (analyser){ stop(); start(); } };
     smoothing.oninput = ()=>{ if (analyser) analyser.smoothingTimeConstant = parseFloat(smoothing.value); };
 
+    // Octave resolution
     octResSel.onchange = ()=>{ octN=parseInt(octResSel.value,10); bands=genBands(octN); peakOct = new Float32Array(bands.length); drawOctave(); };
-    octRangeSel.onchange = ()=>{ octRangeMax=parseInt(octRangeSel.value,10); peakOct && peakOct.fill(0); drawOctave(); };
+
+    // === Dynamic Range controls (preset + slider) ===
+    function applyOctRange(newMax){
+      octRangeMax = Math.max(1, parseInt(newMax,10) || 255);
+      octRangeSlider.value = String(octRangeMax);
+      octRangePreset.value = String([127,255,511].includes(octRangeMax)?octRangeMax:255);
+      octRangeText.textContent = `0–${octRangeMax}`;
+      if (peakOct) peakOct.fill(0); // รีเซ็ตเส้น hold เพื่อไม่ให้ผิดสเกล
+      drawOctave();
+    }
+    octRangePreset.onchange = ()=> applyOctRange(octRangePreset.value);
+    octRangeSlider.oninput = ()=> applyOctRange(octRangeSlider.value);
 
     calibrationInput.onchange = ()=>{ calibrationOffset=parseFloat(calibrationInput.value)||0; };
     btnResetDba.onclick = resetDbaValues;
@@ -725,6 +755,9 @@
     drawHeatmapBackground(ctxHeatmap);
     drawOverlayMessage(ctxHeatmap, heatmapCanvas.width, heatmapCanvas.height);
     (function initDb(){ const {width:w,height:h}=ctxDbMeter.canvas; ctxDbMeter.clearRect(0,0,w,h); })();
+
+    // sync UI ครั้งแรก
+    applyOctRange(octRangePreset.value);
   })();
   </script>
 </body>
