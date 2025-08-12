@@ -18,7 +18,6 @@
       --heatmap-color-1:#0b1220; --heatmap-color-2:#3b82f6; --heatmap-color-3:#22c55e;
       --heatmap-color-4:#facc15; --heatmap-color-5:#ef4444;
       --dba-meter-bg-0-50:#22c55e; --dba-meter-bg-50-70:#facc15; --dba-meter-bg-70-90:#ef4444; --dba-meter-bg-90-140:#be123c;
-      /* ความกว้างสไลด์เรนจ์ (ย่อได้ที่นี่) */
       --oct-range-slider-width: 180px;
     }
     :root{ color-scheme:dark }
@@ -29,7 +28,6 @@
       color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans Thai",sans-serif;
       -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; overscroll-behavior:contain;
     }
-    /* safe-area */
     body::before,body::after{content:"";position:fixed;left:0;right:0;z-index:9999;background:#0a1120;pointer-events:none}
     body::before{top:0;height:env(safe-area-inset-top)} body::after{bottom:0;height:env(safe-area-inset-bottom)}
     @supports(padding: env(safe-area-inset-left)){
@@ -72,13 +70,13 @@
     /* ===== Inline compact octave range slider ===== */
     .oct-head{display:flex;align-items:center;gap:10px;justify-content:space-between}
     .oct-left{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
-    #octRangeSlider{
-      width:var(--oct-range-slider-width);
-      height:4px;
-    }
-    @media (max-width:560px){
-      #octRangeSlider{ width:140px }
-    }
+    #octRangeSlider{ width:var(--oct-range-slider-width); height:4px; }
+    @media (max-width:560px){ #octRangeSlider{ width:140px } }
+
+    /* Heatmap controls inline */
+    .heat-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .heat-controls label input[type=number]{width:64px;padding:4px;border-radius:6px;border:1px solid #374151;background:#1f2937;color:white;}
+    .heat-controls input[type=range]{width:120px}
   </style>
 </head>
 <body>
@@ -148,7 +146,6 @@
         <div class="oct-head" style="margin-bottom:2px">
           <div class="oct-left">
             <b id="octTitle">RTA แบบ 1/6 Octave (Linear Axis)</b>
-            <!-- สไลด์เรนจ์แบบสั้น อยู่คั่นระหว่างชื่อกับข้อความช่วงความถี่ -->
             <input id="octRangeSlider" type="range" min="64" max="1023" step="1" value="255" aria-label="Octave bar range">
           </div>
           <span class="row" style="gap:10px;align-items:center">
@@ -181,9 +178,21 @@
       </div>
 
       <div class="card" id="heatmapCard">
-        <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:2px">
+        <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:6px">
           <b>Spectrogram / Heatmap</b>
-          <button id="btnToggleHeatmap" class="ghost" aria-pressed="true">🔥 Heatmap: ON</button>
+          <div class="heat-controls">
+            <label>Mode
+              <select id="heatScaleMode">
+                <option value="auto" selected>Auto</option>
+                <option value="abs">Absolute</option>
+                <option value="rel">Feedback (Relative)</option>
+              </select>
+            </label>
+            <label id="heatAbsMinWrap">Min <input id="heatMin" type="number" step="1" value="-60"></label>
+            <label id="heatAbsMaxWrap">Max <input id="heatMax" type="number" step="1" value="-20"></label>
+            <label>Contrast <input id="heatGamma" type="range" min="0.6" max="2" step="0.05" value="1.2"></label>
+            <button id="btnToggleHeatmap" class="ghost" aria-pressed="true">🔥 Heatmap: ON</button>
+          </div>
         </div>
         <div class="plot">
           <canvas id="heatmapCanvas" width="1200" height="320"></canvas>
@@ -230,7 +239,7 @@
 
     // ===== Const & helpers =====
     const PAD={L:40,R:10,T:10,B:32}, LABEL_Y=10;
-    const HEATMAP_UPDATE_MS=33, HEATMAP_FREQ_BINS=300;
+    const HEATMAP_UPDATE_MS=33, HEATMAP_FREQ_BINS=300, HM_HISTORY=200;
 
     const getStyle=(p)=>getComputedStyle(document.documentElement).getPropertyValue(p).trim();
     const GRID_H=getStyle('--gridH'), GRID_V=getStyle('--gridV');
@@ -255,7 +264,6 @@
     const smoothing=document.getElementById('smoothing');
     const avgChk=document.getElementById('avg');
     const aWeightChk=document.getElementById('aWeight');
-    const ec=document.getElementById('ec'), ns=document.getElementById('ns'), agc=document.getElementById('agc');
 
     const fftPeakText=document.getElementById('fftPeakText'), fftHoldText=document.getElementById('fftHoldText');
     const octPeakText=document.getElementById('octPeakText'), octHoldText=document.getElementById('octHoldText');
@@ -277,10 +285,18 @@
     const octTitle=document.getElementById('octTitle');
     const octResSel=document.getElementById('octRes');
 
-    // ใหม่: preset + slider + label
+    // Octave: preset + slider + label
     const octRangePreset=document.getElementById('octRangePreset');
     const octRangeSlider=document.getElementById('octRangeSlider');
     const octRangeText=document.getElementById('octRangeText');
+
+    // Heatmap controls
+    const heatScaleModeSel=document.getElementById('heatScaleMode');
+    const heatMinInp=document.getElementById('heatMin');
+    const heatMaxInp=document.getElementById('heatMax');
+    const heatGammaInp=document.getElementById('heatGamma');
+    const heatAbsMinWrap=document.getElementById('heatAbsMinWrap');
+    const heatAbsMaxWrap=document.getElementById('heatAbsMaxWrap');
 
     const rmsEl=document.getElementById('rms');
     const peakEl=document.getElementById('peak');
@@ -305,16 +321,26 @@
     let octN=6;
     let bands=[];
 
+    // Heatmap state
     let heatmapData=[];
     let heatmapFreqBinMap=null;
     let lastHeatmapUpdate=0;
     let heatmapEnabled=true;
 
+    // Heatmap scaling state
+    let heatScaleMode='auto'; // 'auto' | 'abs' | 'rel'
+    let heatDbMin=-60, heatDbMax=-20;
+    let heatGamma=1.2;
+
+    // Relative (feedback) stats
+    let relMean=null, relVar=null;
+    const REL_ALPHA=0.1; // running stats speed
+
     let calibrationOffset=parseFloat(calibrationInput.value);
     let maxDba=-Infinity;
     let dbaValues=[];
 
-    // Dynamic range
+    // Dynamic range for octave bars
     let octRangeMax=parseInt(octRangePreset.value,10);
 
     // ===== Freq helpers =====
@@ -324,7 +350,47 @@
     function xToFreq(x,w){const fm=fmax();const plotW=w-PAD.L-PAD.R;const t=clamp01((x-PAD.L)/plotW);const lf=Math.log10(fmin)+t*(Math.log10(fm)-Math.log10(fmin));return Math.pow(10,lf);}
     function mapDbToY(db,h){const norm=clamp01((db+100)/100);const plotH=h-PAD.T-PAD.B;return PAD.T+(1-norm)*plotH;}
     function mapLinearToYOct(v,h){const norm=clamp01(v/Math.max(1,octRangeMax));const plotH=h-PAD.T-PAD.B;return PAD.T+(1-norm)*plotH;}
-    function mapDbToColor(db){if(db<-60)return getStyle('--heatmap-color-1');if(db<-40)return getStyle('--heatmap-color-2');if(db<-20)return getStyle('--heatmap-color-3');if(db<-5)return getStyle('--heatmap-color-4');return getStyle('--heatmap-color-5');}
+
+    // Old discrete mapping kept for other uses (FFT grid preview)
+    function mapDbToColor(db){
+      if(db<-60)return getStyle('--heatmap-color-1');
+      if(db<-40)return getStyle('--heatmap-color-2');
+      if(db<-20)return getStyle('--heatmap-color-3');
+      if(db<-5)return getStyle('--heatmap-color-4');
+      return getStyle('--heatmap-color-5');
+    }
+
+    // New normalized color mapping (0..1 -> palette)
+    function mapDbToColorNorm(t){
+      const stops=[
+        getStyle('--heatmap-color-1'),
+        getStyle('--heatmap-color-2'),
+        getStyle('--heatmap-color-3'),
+        getStyle('--heatmap-color-4'),
+        getStyle('--heatmap-color-5'),
+      ];
+      const i=Math.min(3, Math.floor(t*4));
+      return stops[i + (t > (i+0.5)/4 ? 1 : 0)];
+    }
+    const norm01=(v, vmin, vmax, g=1)=>Math.pow(Math.min(1,Math.max(0,(v-vmin)/(vmax-vmin))), g);
+
+    function percentile(arr, p){
+      if(!arr.length) return 0;
+      const k = Math.max(0, Math.min(arr.length-1, Math.floor((p/100)*arr.length)));
+      const a = [...arr].sort((x,y)=>x-y);
+      return a[k];
+    }
+
+    function updateRunningStats(i, val){
+      if(relMean[i]===undefined){relMean[i]=val; relVar[i]=0; return;}
+      const m = relMean[i] + REL_ALPHA*(val - relMean[i]);
+      const v = (1-REL_ALPHA)*(relVar[i] + REL_ALPHA*(val - relMean[i])*(val - m));
+      relMean[i]=m; relVar[i]=v;
+    }
+    function zScore(i, val){
+      const sd = Math.sqrt(Math.max(1e-6, relVar[i]));
+      return (val - relMean[i]) / (sd || 1e-3);
+    }
 
     function genBands(n){
       const r=Math.pow(2,1/n), fm=fmax();
@@ -418,16 +484,64 @@
 
     function drawOverlayMessage(ctx,w,h){ctx.fillStyle='rgba(255,255,255,.4)';ctx.font='24px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('Heatmap OFF',w/2,h/2);}
     function drawHeatmapGuide(ctx,x,h){ctx.save();ctx.strokeStyle='rgba(96,165,250,.75)';ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h-PAD.B);ctx.stroke();ctx.restore();}
+
     function drawHeatmap(){
       const {width:w,height:h}=ctxHeatmap.canvas; const plotH=h-PAD.B; if(!freqArray||!heatmapFreqBinMap) return;
-      const frame=heatmapFreqBinMap.map(bin=>{let sum=0,cnt=0; for(let j=bin.binStart;j<=bin.binEnd;j++){sum+=freqArray[j];cnt++;} const avgDb=cnt>0?dbfs(sum/cnt):-100; return {db:avgDb,fStart:bin.fStart,fEnd:bin.fEnd};});
-      heatmapData.unshift(frame); if(heatmapData.length>200) heatmapData.pop();
-      const timeScale=plotH/200; ctxHeatmap.clearRect(0,0,w,h);
-      for(let i=0;i<heatmapData.length;i++){const y=i*timeScale, row=heatmapData[i]; for(let j=0;j<row.length;j++){const {fStart,fEnd,db}=row[j]; const xL=mapLogX(fStart,w), xR=mapLogX(fEnd,w); ctxHeatmap.fillStyle=mapDbToColor(db); ctxHeatmap.fillRect(xL,y,Math.max(1,xR-xL),timeScale);}}
+
+      // เตรียม running stats สำหรับ relative
+      if(heatScaleMode==='rel' && (!relMean || relMean.length!==heatmapFreqBinMap.length)){
+        relMean=new Array(heatmapFreqBinMap.length);
+        relVar=new Array(heatmapFreqBinMap.length);
+      }
+
+      // สร้างเฟรม
+      const frame=heatmapFreqBinMap.map((bin,i)=>{
+        let sum=0,cnt=0; for(let j=bin.binStart;j<=bin.binEnd;j++){sum+=freqArray[j];cnt++;}
+        const db=cnt>0?dbfs(sum/cnt):-100;
+        if(heatScaleMode==='rel') updateRunningStats(i, db);
+        return {db,i,fStart:bin.fStart,fEnd:bin.fEnd};
+      });
+
+      heatmapData.unshift(frame); if(heatmapData.length>HM_HISTORY) heatmapData.pop();
+
+      // คำนวณสเกล
+      let vmin=heatDbMin, vmax=heatDbMax;
+      if(heatScaleMode==='auto'){
+        const flat=heatmapData.flat().map(d=>d.db);
+        vmin=percentile(flat,10);
+        vmax=percentile(flat,95);
+        if(vmax-vmin<10) vmax=vmin+10;
+      }
+
+      // วาด
+      const timeScale=plotH/HM_HISTORY; ctxHeatmap.clearRect(0,0,w,h);
+      for(let t=0;t<heatmapData.length;t++){
+        const y=t*timeScale, row=heatmapData[t];
+        for(let k=0;k<row.length;k++){
+          const {fStart,fEnd,db,i}=row[k];
+          let tnorm;
+          if(heatScaleMode==='rel'){
+            const z=zScore(i, db); // z > 0 = โดดเด่นกว่าพื้นหลัง
+            const zMax=4; // cap
+            tnorm=Math.min(1, Math.max(0, z/zMax));
+          }else{
+            tnorm=norm01(db, vmin, vmax, heatGamma);
+          }
+          ctxHeatmap.fillStyle=mapDbToColorNorm(tnorm);
+          const xL=mapLogX(fStart,w), xR=mapLogX(fEnd,w);
+          ctxHeatmap.fillRect(xL,y,Math.max(1,xR-xL),timeScale);
+        }
+      }
+
+      // แกนล่าง
       ctxHeatmap.clearRect(0,plotH,w,PAD.B);
-      ctxHeatmap.strokeStyle=GRID_V; [20,31.5,40,50,63,80,100,125,160,200,250,315,400,500,630,800,1000,2000,4000,8000,16000].forEach(t=>{const x=mapLogX(t,w);ctxHeatmap.beginPath();ctxHeatmap.moveTo(x,0);ctxHeatmap.lineTo(x,plotH);ctxHeatmap.stroke();});
+      ctxHeatmap.strokeStyle=GRID_V;
+      [20,31.5,40,50,63,80,100,125,160,200,250,315,400,500,630,800,1000,2000,4000,8000,16000].forEach(t=>{
+        const x=mapLogX(t,w); ctxHeatmap.beginPath(); ctxHeatmap.moveTo(x,0); ctxHeatmap.lineTo(x,plotH); ctxHeatmap.stroke();
+      });
       ctxHeatmap.fillStyle=LABEL; ctxHeatmap.font='12px system-ui'; ctxHeatmap.textBaseline='alphabetic';
-      [31.5,63,125,250,500,1000,2000,4000,8000,16000].forEach(t=>{const x=mapLogX(t,w);ctxHeatmap.fillText(t>=1000?(t/1000)+'k':t,x-8,h-LABEL_Y);});
+      [31.5,63,125,250,500,1000,2000,4000,8000,16000].forEach(t=>{const x=mapLogX(t,w); ctxHeatmap.fillText(t>=1000?(t/1000)+'k':t, x-8, h-LABEL_Y);});
+
       if(guideHeatmap) drawHeatmapGuide(ctxHeatmap,guideHeatmap.xPx,h);
     }
 
@@ -514,11 +628,22 @@
       octRangeSlider.value=String(octRangeMax);
       octRangePreset.value=String([127,255,511].includes(octRangeMax)?octRangeMax:255);
       octRangeText.textContent=`0–${octRangeMax}`;
-      if(peakOct) peakOct.fill(0); // รีเซ็ต hold ให้เข้ากับสเกลใหม่
+      if(peakOct) peakOct.fill(0);
       drawOctave();
     }
     octRangePreset.onchange=()=>applyOctRange(octRangePreset.value);
     octRangeSlider.oninput=()=>applyOctRange(octRangeSlider.value);
+
+    // Heatmap scaling controls
+    function syncHeatAbsVisibility(){
+      const show = heatScaleMode==='abs';
+      heatAbsMinWrap.style.display = show ? '' : 'none';
+      heatAbsMaxWrap.style.display = show ? '' : 'none';
+    }
+    heatScaleModeSel.onchange=()=>{heatScaleMode=heatScaleModeSel.value; syncHeatAbsVisibility();};
+    heatMinInp.onchange=()=>{heatDbMin=parseFloat(heatMinInp.value)||-70;};
+    heatMaxInp.onchange=()=>{heatDbMax=parseFloat(heatMaxInp.value)||-20; if(heatDbMax<=heatDbMin) heatDbMax=heatDbMin+1; heatMaxInp.value=heatDbMax;};
+    heatGammaInp.oninput=()=>{heatGamma=parseFloat(heatGammaInp.value)||1.0;};
 
     calibrationInput.onchange=()=>{calibrationOffset=parseFloat(calibrationInput.value)||0;};
     btnResetDba.onclick=resetDbaValues;
@@ -536,6 +661,7 @@
 
     // sync UI ครั้งแรก
     applyOctRange(octRangePreset.value);
+    syncHeatAbsVisibility();
 
   })();
   </script>
