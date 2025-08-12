@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a1120" />
+  <meta name="theme-color" content="#0a1120" media="(prefers-color-scheme: dark)" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Mobile RTA (เพิ่มค่าเฉลี่ยและสูงสุด)</title>
+
+  <style>
+    :root {
+      --bg1:#0b1220; --bg2:#0a1120; --card:#111827; --text:#e5e7eb; --muted:#9ca3af;
+      --gridH:rgba(255,255,255,0.06); --gridV:rgba(255,255,255,0.035);
+      --frame:rgba(255,255,255,0.08); --label:rgba(255,255,255,0.55);
+      --fft:#34d399; --peak:#a78bfa; --hold:#facc15; --bar:#34d399;
+      --heatmap-color-1:#0b1220; --heatmap-color-2:#3b82f6; --heatmap-color-3:#22c55e;
+      --heatmap-color-4:#facc15; --heatmap-color-5:#ef4444;
+      --dba-meter-bg-0-50:#22c55e; --dba-meter-bg-50-70:#facc15; --dba-meter-bg-70-90:#ef4444; --dba-meter-bg-90-140:#be123c;
+    }
+    :root { color-scheme: dark; }
+    html{ background:#0a1120; }
+    body{
+      margin:0; height:100%;
+      background:radial-gradient(1200px 600px at 70% -10%, #0f1730 10%, var(--bg1) 60%, var(--bg2) 100%);
+      color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans Thai",sans-serif;
+      -webkit-touch-callout:none; -webkit-user-select:none; user-select:none;
+      overscroll-behavior:contain;
+    }
+    /* เติม safe-area ให้เป็นสีธีม */
+    body::before, body::after{content:"";position:fixed;left:0;right:0;z-index:9999;background:#0a1120;pointer-events:none}
+    body::before{top:0;height:env(safe-area-inset-top)} body::after{bottom:0;height:env(safe-area-inset-bottom)}
+    @supports (padding: env(safe-area-inset-left)) {
+      html::before, html::after{content:"";position:fixed;top:0;bottom:0;background:#0a1120;z-index:9998;pointer-events:none}
+      html::before{left:0;width:env(safe-area-inset-left)} html::after{right:0;width:env(safe-area-inset-right)}
+    }
+
+    .wrap{
+      display:flex; flex-direction:column; gap:12px; max-width:920px; margin:0 auto;
+      padding-left:calc(12px + env(safe-area-inset-left));
+      padding-right:calc(12px + env(safe-area-inset-right));
+      padding-top:calc(12px + env(safe-area-inset-top));
+      padding-bottom:calc(12px + env(safe-area-inset-bottom));
+    }
+    .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+    .card{background:var(--card);border:1px solid #1f2937;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.25);padding:12px}
+    button,select,input[type=range],input[type=number]{-webkit-tap-highlight-color:transparent}
+    button{background:#10b981;border:none;color:white;padding:10px 14px;border-radius:12px;font-weight:700;cursor:pointer}
+    button.secondary{background:#374151} button.ghost{background:#1f2937}
+    label{font-size:12px;color:var(--muted)}
+    .meters{display:grid;grid-template-columns:1fr;gap:12px}
+    canvas{width:100%;height:320px;background:#0b1220;border-radius:12px;touch-action:none}
+    
+    /* ปรับปรุง CSS สำหรับแถบวัด dB-A */
+    #dbMeterContainer {
+      position: relative;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 999px; /* ทำให้โค้งมน */
+      overflow: hidden; /* ซ่อนส่วนเกินเมื่อบาร์วิ่ง */
+    }
+    #dbMeterCanvas {
+      height: 20px; /* ลดความสูงลงเหลือ 1/3 */
+      background: transparent;
+      border-radius: 999px; /* ทำให้โค้งมน */
+    }
+    
+    .dbLabel { position: absolute; font-size: 10px; color: var(--muted); bottom: 4px; }
+    
+    .hint{font-size:12px;color:var(--muted)}
+    .kv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+    .kv div{background:#0e1628;border:1px solid #1f2937;border-radius:12px;padding:8px}
+    .kv b{display:block;color:#cbd5e1;font-size:12px;margin-bottom:4px}
+    .badges{display:flex;justify-content:flex-end;gap:6px;margin:4px 0 6px 0}
+    .badge{padding:4px 8px;border-radius:999px;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.12);font-size:12px;color:#e5e7eb;white-space:nowrap}
+    .tip{
+      position:absolute; padding:4px 6px; font-size:12px; color:#e5e7eb;
+      background:rgba(0,0,0,.6); border:1px solid rgba(255,255,255,.12);
+      border-radius:8px; transform:translate(-50%,-100%); pointer-events:none;
+      white-space:nowrap; z-index: 10;
+    }
+    .plot{ position:relative; }
+    
+    /* NEW: Flexbox container for the dB-A values */
+    .dba-values-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .dba-values-row .kv-item {
+      flex: 1;
+      background: #0e1628;
+      border: 1px solid #1f2937;
+      border-radius: 12px;
+      padding: 8px;
+      text-align: center;
+    }
+    .dba-values-row .kv-item b {
+      display: block;
+      color: #cbd5e1;
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <!-- Error banner (hidden by default) -->
+    <div id="errBox" class="card" style="display:none;border-color:#b91c1c;background:#111317">
+      <b style="color:#fecaca">ไม่สามารถเริ่มวัดได้</b>
+      <div id="errMsg" class="hint" style="color:#fca5a5">—</div>
+    </div>
+    
+        <div class="row">
+          <button id="btnStart">▶️ เริ่มวัด</button>
+          <button id="btnStop" class="secondary" disabled>⏸️ หยุด</button>
+          <button id="btnHold" class="ghost" aria-pressed="false">📌 Hold Peak: OFF</button>
+          <button id="btnClear" class="secondary">♻️ Clear Peak</button>
+        </div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <label>FFT Size
+          <select id="fft">
+            <option value="2048">2048</option>
+            <option value="4096" selected>4096</option>
+            <option value="8192">8192</option>
+            <option value="16384">16384</option>
+          </select>
+        </label>
+        <label> Smoothing <input id="smoothing" type="range" min="0" max="0.95" step="0.01" value="0.75"></label>
+        <label> Averaging <input id="avg" type="checkbox" checked></label>
+        <label> A-weighting (เดโม่) <input id="aWeight" type="checkbox"></label>
+      </div>
+      <div class="row">
+        <label>พยายามปิด DSP ของระบบ (บางเครื่องอาจไม่ยอมปิด):</label>
+        <div class="row">
+          <label>echoCancellation <input id="ec" type="checkbox" checked></label>
+          <label>noiseSuppression <input id="ns" type="checkbox" checked></label>
+          <label>autoGainControl <input id="agc" type="checkbox" checked></label>
+        </div>
+      </div>
+    </div>
+    
+    <div class="meters">
+      <div class="card">
+        <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:2px">
+          <b>RTA แบบละเอียด (FFT, Log Frequency)</b>
+          <span class="hint" id="labelRate">—</span>
+        </div>
+        <div class="badges">
+          <span class="badge" id="fftPeakText">Peak: —</span>
+          <span class="badge" id="fftHoldText" style="display:none;">Hold: —</span>
+        </div>
+        <div class="plot">
+          <canvas id="fftCanvas" width="1200" height="320"></canvas>
+          <div id="fftTip" class="tip" style="display:none">—</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:2px">
+          <b id="octTitle">RTA แบบ 1/6 Octave (Linear Axis)</b>
+          <span class="row" style="gap:10px;align-items:center">
+            <span class="hint" id="labelOct">20 Hz – 20 kHz</span>
+            <label>Octave
+              <select id="octRes">
+                <option value="3">1/3</option>
+                <option value="6" selected>1/6</option>
+              </select>
+            </label>
+          </span>
+        </div>
+        <div class="badges">
+          <span class="badge" id="octPeakText">Peak: —</span>
+          <span class="badge" id="octHoldText" style="display:none;">Hold: —</span>
+        </div>
+        <div class="plot">
+          <canvas id="octCanvas" width="1200" height="320"></canvas>
+          <div id="octTip" class="tip" style="display:none">—</div>
+        </div>
+      </div>
+
+      <div class="card" id="heatmapCard">
+        <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:2px">
+          <b>Spectrogram / Heatmap</b>
+          <button id="btnToggleHeatmap" class="ghost" aria-pressed="true">🔥 Heatmap: ON</button>
+        </div>
+        <div class="plot">
+          <canvas id="heatmapCanvas" width="1200" height="320"></canvas>
+          <div id="heatmapTip" class="tip" style="display:none">—</div>
+        </div>
+      </div>
+
+      <!-- Meter สำหรับวัดค่า dB-A ที่ปรับปรุงใหม่ -->
+      <div class="card">
+        <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:2px">
+          <b>ความดังรวม dB-A</b>
+          <button id="btnResetDba" class="secondary" style="font-size:12px;padding:6px 10px;">♻️ Reset AVG/MAX</button>
+        </div>
+        
+        <!-- Db meter bar -->
+        <div id="dbMeterContainer">
+          <canvas id="dbMeterCanvas" width="1200" height="20"></canvas>
+          <span class="dbLabel" style="left: 0%;">0</span>
+          <span class="dbLabel" style="left: 28.57%;">40</span>
+          <span class="dbLabel" style="left: 57.14%;">80</span>
+          <span class="dbLabel" style="left: 85.71%;">120</span>
+          <span class="dbLabel" style="right: 0;">140</span>
+        </div>
+        
+        <!-- Flexbox container for the values, now placed AFTER the db meter bar -->
+        <div class="dba-values-row" style="margin-top: 12px;">
+            <div class="kv-item"><b>Realtime (dB-A)</b><span id="dbRealtimeValue">—</span></div>
+            <div class="kv-item"><b>AVG (dB-A)</b><span id="dbAvgValue">—</span></div>
+            <div class="kv-item"><b>MAX (dB-A)</b><span id="dbMaxValue">—</span></div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="card kv">
+      <div><b>ระดับ RMS (ดิบ dBFS)</b><span id="rms">—</span></div>
+      <div><b>ความถี่พีคโดยประมาณ</b><span id="peak">—</span></div>
+    </div>
+
+    <!-- ส่วนควบคุมใหม่สำหรับ Calibration -->
+    <div class="card row" style="justify-content:space-between;align-items:center;margin-top:0">
+      <div class="hint">ตั้งค่าออฟเซ็ตเพื่อแปลง dBFS เป็น dBA (จากไมค์มือถือ)</div>
+      <label>Calibration Offset (dB) <input id="calibrationOffset" type="number" min="0" step="0.1" value="80" style="width:60px;padding:4px;border-radius:6px;border:1px solid #374151;background:#1f2937;color:white;"></label>
+    </div>
+
+    <div class="card hint">ข้อจำกัด: ไมค์มือถือมี DSP/AGC และการตอบสนองความถี่ไม่แฟลต ใช้ดูแนว EQ ได้แต่ไม่ใช่มาตรวัด SPL มืออาชีพ</div>
+  </div>
+
+  <script>
+    (() => {
+      // General constants and helper functions
+      const PAD = { L: 40, R: 10, T: 10, B: 32 };
+      const LABEL_Y = 10;
+      const heatmapCanvasHeight = 320;
+      const getStyle = (prop) => getComputedStyle(document.documentElement).getPropertyValue(prop).trim();
+      const GRID_H = getStyle('--gridH');
+      const GRID_V = getStyle('--gridV');
+      const FRAME  = getStyle('--frame');
+      const LABEL  = getStyle('--label');
+      const FFT_COLOR = getStyle('--fft');
+      const PEAK_COLOR = getStyle('--peak');
+      const HOLD_COLOR = getStyle('--hold');
+      const BAR_COLOR = getStyle('--bar');
+
+      // DOM Elements
+      const btnStart = document.getElementById('btnStart');
+      const btnStop  = document.getElementById('btnStop');
+      const btnHold  = document.getElementById('btnHold');
+      const btnClear = document.getElementById('btnClear');
+      const btnToggleHeatmap = document.getElementById('btnToggleHeatmap');
+      const btnResetDba = document.getElementById('btnResetDba');
+      const fftSel   = document.getElementById('fft');
+      const smoothing= document.getElementById('smoothing');
+      const avgChk   = document.getElementById('avg');
+      const aWeightChk = document.getElementById('aWeight');
+      const ec = document.getElementById('ec');
+      const ns = document.getElementById('ns');
+      const agc = document.getElementById('agc');
+      const fftPeakText = document.getElementById('fftPeakText');
+      const fftHoldText = document.getElementById('fftHoldText');
+      const octPeakText = document.getElementById('octPeakText');
+      const octHoldText = document.getElementById('octHoldText');
+      const fftCanvas = document.getElementById('fftCanvas');
+      const octCanvas = document.getElementById('octCanvas');
+      const heatmapCanvas = document.getElementById('heatmapCanvas');
+      const dbMeterCanvas = document.getElementById('dbMeterCanvas');
+      const fftTip = document.getElementById('fftTip');
+      const octTip = document.getElementById('octTip');
+      const heatmapTip = document.getElementById('heatmapTip');
+      
+      const dbRealtimeValue = document.getElementById('dbRealtimeValue');
+      const dbAvgValue = document.getElementById('dbAvgValue');
+      const dbMaxValue = document.getElementById('dbMaxValue');
+
+      const calibrationInput = document.getElementById('calibrationOffset');
+      const ctxFFT = fftCanvas.getContext('2d');
+      const ctxOct = octCanvas.getContext('2d');
+      const ctxHeatmap = heatmapCanvas.getContext('2d');
+      const ctxDbMeter = dbMeterCanvas.getContext('2d');
+      const labelRate = document.getElementById('labelRate');
+      const labelOct  = document.getElementById('labelOct');
+      const octTitle  = document.getElementById('octTitle');
+      const rmsEl = document.getElementById('rms');
+      const peakEl= document.getElementById('peak');
+      const octResSel = document.getElementById('octRes');
+
+      // Audio state
+      let audioCtx, analyser, micSrc, rafId;
+      let dataArray, freqArray;
+      let sampleRate = 48000;
+      let avgBuffer = null;
+      let running = false;
+      let holdEnabled = false;
+      let peakArray = null;
+      let peakOct   = null;
+      let guideFFT = null;
+      let guideOCT = null;
+      let guideHeatmap = null;
+      let octN = 6;
+      let bands = [];
+
+      // Heatmap state
+      let heatmapData = [];
+      const maxHeatmapData = 200;
+      const heatmapFreqBins = 300;
+      const HEATMAP_UPDATE_RATE_MS = 33;
+      let lastHeatmapUpdate = 0;
+      let heatmapEnabled = true;
+      let heatmapFreqBinMap = null;
+
+      // Calibration state
+      let calibrationOffset = parseFloat(calibrationInput.value);
+
+      // dB-A AVG/MAX variables
+      let maxDba = -Infinity;
+      let dbaValues = [];
+
+      // ==== Helper Functions ====
+      const dbfs = v => 20 * Math.log10(v / 255 + 1e-12);
+      const clamp01 = v => Math.min(1, Math.max(0, v));
+      function aWeighting(f){ const f2=f*f; const ra=(12200**2*f2**2)/((f2+20.6**2)*(f2+12200**2)*Math.sqrt((f2+107.7**2)*(f2+737.9**2))); return 20*Math.log10(ra)+2.0; }
+      function fmtHz(f){ return f>=1000 ? ((f/1000>=10? (f/1000).toFixed(0):(f/1000).toFixed(1))+' kHz') : (Math.round(f)+' Hz'); }
+      const fmax = () => Math.min(sampleRate / 2, 20000);
+      const fmin = 20;
+      function mapLogX(f, width) {
+        const fm = fmax();
+        const t = (Math.log10(Math.max(f, fmin)) - Math.log10(fmin)) / (Math.log10(fm) - Math.log10(fmin));
+        return PAD.L + t * (width - PAD.L - PAD.R);
+      }
+      function xToFreq(x, width) {
+        const fm = fmax();
+        const plotW = width - PAD.L - PAD.R;
+        const t = clamp01((x - PAD.L) / plotW);
+        const lf = Math.log10(fmin) + t * (Math.log10(fm) - Math.log10(fmin));
+        return Math.pow(10, lf);
+      }
+      function mapDbToY(db, height) {
+        const norm = clamp01((db + 100) / 100);
+        const plotH = height - PAD.T - PAD.B;
+        return PAD.T + (1 - norm) * plotH;
+      }
+      function mapLinearToY(value, height) {
+        const norm = clamp01(value / 255);
+        const plotH = height - PAD.T - PAD.B;
+        return PAD.T + (1 - norm) * plotH;
+      }
+      function mapDbToColor(db) {
+        if (db < -60) return getStyle('--heatmap-color-1');
+        if (db < -40) return getStyle('--heatmap-color-2');
+        if (db < -20) return getStyle('--heatmap-color-3');
+        if (db < -5) return getStyle('--heatmap-color-4');
+        return getStyle('--heatmap-color-5');
+      }
+      function genBands(n) {
+        const r = Math.pow(2, 1 / n);
+        const fm = fmax();
+        const kmin = Math.ceil(Math.log(fmin / 1000) / Math.log(r));
+        const kmax = Math.floor(Math.log(fm / 1000) / Math.log(r));
+        const edgeHalf = Math.pow(2, 1 / (2 * n));
+        const arr = [];
+        for (let k = kmin; k <= kmax; k++) {
+          const fc = 1000 * Math.pow(r, k);
+          const fl = fc / edgeHalf;
+          const fh = fc * edgeHalf;
+          if (fh < fmin || fl > fm) continue;
+          arr.push({ fc, fl: Math.max(fl, fmin), fh: Math.min(fh, fm) });
+        }
+        labelOct.textContent = `${Math.round(arr[0].fc)} Hz – ${Math.round(arr[arr.length - 1].fc)} Hz`;
+        octTitle.textContent = `RTA แบบ 1/${n} Octave (Linear Axis)`;
+        return arr;
+      }
+      function genHeatmapBins() {
+        if (!analyser) return null;
+        const fm = fmax();
+        const fpb = sampleRate / analyser.fftSize;
+        const logFmin = Math.log10(fmin);
+        const logFmax = Math.log10(fm);
+        const bins = [];
+        for (let i = 0; i < 300; i++) {
+          const logFStart = logFmin + (i / 300) * (logFmax - logFmin);
+          const logFEnd = logFmin + ((i + 1) / 300) * (logFmax - logFmin);
+          const fStart = Math.pow(10, logFStart);
+          const fEnd = Math.pow(10, logFEnd);
+          const binStart = Math.max(0, Math.floor(fStart / fpb));
+          const binEnd = Math.min(analyser.frequencyBinCount - 1, Math.ceil(fEnd / fpb));
+          bins.push({ binStart, binEnd, fStart, fEnd });
+        }
+        return bins;
+      }
+      function drawBackground(ctx) {
+        const {width: w, height: h} = ctx.canvas;
+        ctx.clearRect(0, 0, w, h);
+        const plotH = h - PAD.T - PAD.B;
+        ctx.strokeStyle = GRID_H;
+        for (let i = 0; i < 6; i++) {
+          const y = PAD.T + (i / 5) * plotH;
+          ctx.beginPath(); ctx.moveTo(PAD.L, y); ctx.lineTo(w - PAD.R, y); ctx.stroke();
+        }
+        ctx.strokeStyle = GRID_V;
+        const ticks = [20, 31.5, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 2000, 4000, 8000, 16000];
+        ticks.forEach(t => {
+          const x = mapLogX(t, w);
+          ctx.beginPath(); ctx.moveTo(x, PAD.T); ctx.lineTo(x, PAD.T + plotH); ctx.stroke();
+        });
+        ctx.strokeStyle = FRAME;
+        ctx.strokeRect(PAD.L, PAD.T, w - PAD.L - PAD.R, plotH);
+        ctx.fillStyle = LABEL;
+        ctx.font = '12px system-ui';
+        ctx.textBaseline = 'alphabetic';
+        [31.5, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000].forEach(t => {
+          const x = mapLogX(t, w);
+          ctx.fillText(t >= 1000 ? (t / 1000) + 'k' : t, x - 8, h - LABEL_Y);
+        });
+      }
+      function drawPeakLine(ctx, x, h, color, dashed = false) {
+        const y0 = PAD.T, y1 = h - PAD.B;
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1;
+        if (dashed) ctx.setLineDash([5, 5]);
+        ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y1); ctx.stroke();
+        ctx.restore();
+      }
+      function drawGuide(ctx, x, h) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(96,165,250,.75)'; ctx.setLineDash([4, 4]);
+        ctx.beginPath(); ctx.moveTo(x, PAD.T); ctx.lineTo(x, h - PAD.B); ctx.stroke();
+        ctx.restore();
+      }
+      function drawFFT() {
+        const {width: w, height: h} = ctxFFT.canvas;
+        drawBackground(ctxFFT);
+        if (!freqArray) return;
+        const N = freqArray.length;
+        const fpb = sampleRate / (2 * N);
+        let peakBin = 0, peakVal = -Infinity;
+        for (let i = 0; i < N; i++) {
+          if (freqArray[i] > peakVal) {
+            peakVal = freqArray[i];
+            peakBin = i;
+          }
+        }
+        const peakFreqNow = peakBin * fpb;
+        const peakDbNow = dbfs(freqArray[peakBin] || 0);
+        peakEl.textContent = Math.round(peakFreqNow) + ' Hz';
+        if (!peakArray || peakArray.length !== N) peakArray = new Uint8Array(N);
+        if (holdEnabled) for (let i = 0; i < N; i++) peakArray[i] = Math.max(peakArray[i], freqArray[i]);
+        ctxFFT.beginPath();
+        let started = false;
+        for (let i = 1; i < N; i++) {
+          const f = i * fpb;
+          if (f < 20) continue;
+          if (f > 20000) break;
+          const x = mapLogX(f, w);
+          const y = mapDbToY(dbfs(freqArray[i]), h);
+          if (!started) {
+            ctxFFT.moveTo(x, y);
+            started = true;
+          } else ctxFFT.lineTo(x, y);
+        }
+        ctxFFT.strokeStyle = FFT_COLOR;
+        ctxFFT.lineWidth = 2;
+        ctxFFT.stroke();
+        ctxFFT.beginPath();
+        started = false;
+        for (let i = 1; i < N; i++) {
+          const f = i * fpb;
+          if (f < 20) continue;
+          if (f > 20000) break;
+          const x = mapLogX(f, w);
+          const y = mapDbToY(dbfs(peakArray[i] || 0), h);
+          if (!started) {
+            ctxFFT.moveTo(x, y);
+            started = true;
+          } else ctxFFT.lineTo(x, y);
+        }
+        ctxFFT.save();
+        ctxFFT.globalAlpha = 0.35;
+        ctxFFT.strokeStyle = PEAK_COLOR;
+        ctxFFT.lineWidth = 1.25;
+        ctxFFT.stroke();
+        ctxFFT.restore();
+        const xPeakNow = mapLogX(peakFreqNow, w);
+        drawPeakLine(ctxFFT, xPeakNow, h, 'rgba(96,165,250,0.6)', false);
+        let holdBin = 0, holdVal = 0;
+        for (let i = 0; i < N; i++) {
+          if (peakArray[i] > holdVal) {
+            holdVal = peakArray[i];
+            holdBin = i;
+          }
+        }
+        if (holdVal > 0) {
+          drawPeakLine(ctxFFT, mapLogX(holdBin * fpb, w), h, 'rgba(250,204,21,0.55)', true);
+        }
+        fftPeakText.textContent = `Peak: ${fmtHz(peakFreqNow)} • ${peakDbNow.toFixed(1)} dBFS`;
+        if (holdVal > 0) {
+          fftHoldText.style.display = '';
+          fftHoldText.textContent = `Hold: ${fmtHz(holdBin * fpb)} • ${dbfs(holdVal).toFixed(1)} dBFS`;
+        } else {
+          fftHoldText.style.display = 'none';
+        }
+        if (guideFFT) {
+          drawGuide(ctxFFT, guideFFT.xPx, h);
+        }
+      }
+      function drawOctave() {
+        const {width: w, height: h} = ctxOct.canvas;
+        drawBackground(ctxOct);
+        if (!freqArray || !bands.length) return;
+        const N = freqArray.length;
+        const fpb = sampleRate / (2 * N);
+        const vals = bands.map(b => {
+          const s = Math.max(0, Math.floor(b.fl / fpb)), e = Math.min(N - 1, Math.ceil(b.fh / fpb));
+          let sum = 0, cnt = 0;
+          for (let i = s; i <= e; i++) {
+            sum += freqArray[i];
+            cnt++;
+          }
+          let v = cnt ? (sum / cnt) : 0;
+          if (aWeightChk.checked) v *= Math.pow(10, aWeighting(b.fc) / 20);
+          return v;
+        });
+        if (!peakOct || peakOct.length !== vals.length) peakOct = new Float32Array(vals.length);
+        if (holdEnabled) for (let i = 0; i < vals.length; i++) peakOct[i] = Math.max(peakOct[i], vals[i]);
+        ctxOct.fillStyle = BAR_COLOR;
+        for (let i = 0; i < vals.length; i++) {
+          const b = bands[i];
+          const xL = mapLogX(b.fl, w), xR = mapLogX(b.fh, w);
+          const barW = Math.max(2, xR - xL - 2);
+          const y = mapLinearToY(vals[i], h);
+          const plotBottom = h - PAD.B;
+          const hh = (plotBottom - y);
+          ctxOct.fillRect(xL + 1, y, barW, Math.max(1, hh));
+        }
+        ctxOct.beginPath();
+        for (let i = 0; i < vals.length; i++) {
+          const cx = mapLogX(bands[i].fc, w);
+          const y = mapLinearToY(peakOct[i] || 0, h);
+          if (i === 0) ctxOct.moveTo(cx, y);
+          else ctxOct.lineTo(cx, y);
+        }
+        ctxOct.save();
+        ctxOct.globalAlpha = 0.45;
+        ctxOct.strokeStyle = HOLD_COLOR;
+        ctxOct.lineWidth = 1.5;
+        ctxOct.stroke();
+        ctxOct.restore();
+        let idxNow = 0, vNow = -1;
+        for (let i = 0; i < vals.length; i++) {
+          if (vals[i] > vNow) {
+            vNow = vals[i];
+            idxNow = i;
+          }
+        }
+        drawPeakLine(ctxOct, mapLogX(bands[idxNow].fc, w), h, 'rgba(96,165,250,0.6)', false);
+        let idxHold = 0, vHold = 0;
+        for (let i = 0; i < peakOct.length; i++) {
+          if (peakOct[i] > vHold) {
+            vHold = peakOct[i];
+            idxHold = i;
+          }
+        }
+        if (vHold > 0) {
+          drawPeakLine(ctxOct, mapLogX(bands[idxHold].fc, w), h, 'rgba(250,204,21,0.55)', true);
+        }
+        octPeakText.textContent = `Peak: ${fmtHz(bands[idxNow].fc)} • ${vNow.toFixed(1)} / 255`;
+        if (vHold > 0) {
+          octHoldText.style.display = '';
+          octHoldText.textContent = `Hold: ${fmtHz(bands[idxHold].fc)} • ${vHold.toFixed(1)} / 255`;
+        } else {
+          octHoldText.style.display = 'none';
+        }
+        if (guideOCT) {
+          drawGuide(ctxOct, guideOCT.xPx, h);
+        }
+      }
+      function drawOverlayMessage(ctx, w, h) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.font = '24px system-ui';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('Heatmap OFF', w / 2, h / 2);
+      }
+      function drawHeatmapGuide(ctx, x, h) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(96,165,250,.75)';
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, h - PAD.B);
+        ctx.stroke();
+        ctx.restore();
+      }
+      function drawHeatmap() {
+        const {width: w, height: h} = ctxHeatmap.canvas;
+        const plotHeatmapH = h - PAD.B;
+        if (!freqArray || !heatmapFreqBinMap) return;
+        const currentData = heatmapFreqBinMap.map(bin => {
+          let sum = 0;
+          let count = 0;
+          for (let j = bin.binStart; j <= bin.binEnd; j++) {
+            sum += freqArray[j];
+            count++;
+          }
+          const avgDb = count > 0 ? dbfs(sum / count) : -100;
+          return { db: avgDb, fStart: bin.fStart, fEnd: bin.fEnd };
+        });
+        heatmapData.unshift(currentData);
+        if (heatmapData.length > 200) {
+          heatmapData.pop();
+        }
+        const timeScale = plotHeatmapH / 200;
+        ctxHeatmap.clearRect(0, 0, w, h);
+        for (let i = 0; i < heatmapData.length; i++) {
+          const y = i * timeScale;
+          const frameData = heatmapData[i];
+          for (let j = 0; j < frameData.length; j++) {
+            const { fStart, fEnd, db } = frameData[j];
+            const xL = mapLogX(fStart, w);
+            const xR = mapLogX(fEnd, w);
+            const barWidth = Math.max(1, xR - xL);
+            ctxHeatmap.fillStyle = mapDbToColor(db);
+            ctxHeatmap.fillRect(xL, y, barWidth, timeScale);
+          }
+        }
+        ctxHeatmap.clearRect(0, plotHeatmapH, w, PAD.B);
+        ctxHeatmap.strokeStyle = GRID_V;
+        const ticks = [20, 31.5, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 2000, 4000, 8000, 16000];
+        ticks.forEach(t => {
+          const x = mapLogX(t, w);
+          ctxHeatmap.beginPath(); ctxHeatmap.moveTo(x, 0); ctxHeatmap.lineTo(x, plotHeatmapH); ctxHeatmap.stroke();
+        });
+        ctxHeatmap.fillStyle = LABEL;
+        ctxHeatmap.font = '12px system-ui';
+        ctxHeatmap.textBaseline = 'alphabetic';
+        [31.5, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000].forEach(t => {
+          const x = mapLogX(t, w);
+          ctxHeatmap.fillText(t >= 1000 ? (t / 1000) + 'k' : t, x - 8, h - LABEL_Y);
+        });
+        if (guideHeatmap) {
+            drawHeatmapGuide(ctxHeatmap, guideHeatmap.xPx, h);
+        }
+      }
+      function updateRMS() {
+        if (!dataArray) return;
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) {
+          const v = (dataArray[i] - 128) / 128;
+          sum += v * v;
+        }
+        const rms = Math.sqrt(sum / dataArray.length);
+        const db = 20 * Math.log10(rms + 1e-12);
+        rmsEl.textContent = db.toFixed(1) + ' dBFS';
+      }
+      function calculateDba() {
+        if (!freqArray || !analyser) return -Infinity;
+        const N = freqArray.length;
+        const fpb = sampleRate / analyser.fftSize;
+        let sum = 0;
+        for (let i = 0; i < N; i++) {
+          const f = i * fpb;
+          const aWeightGain = Math.pow(10, aWeighting(f) / 20);
+          const value = freqArray[i] * aWeightGain;
+          sum += value ** 2;
+        }
+        const rms = Math.sqrt(sum / N);
+        const dbfsValue = 20 * Math.log10(rms / 255 + 1e-12);
+        return dbfsValue + calibrationOffset;
+      }
+      function drawDbMeterBackground() {
+        const { width: w, height: h } = ctxDbMeter.canvas;
+        ctxDbMeter.clearRect(0, 0, w, h);
+      }
+      function updateDbMeter(db) {
+        const { width: w, height: h } = ctxDbMeter.canvas;
+        const dbMin = 0, dbMax = 140; 
+        const width = w * clamp01((db - dbMin) / (dbMax - dbMin));
+        const gradient = ctxDbMeter.createLinearGradient(0, 0, w, 0);
+        gradient.addColorStop(0, getStyle('--dba-meter-bg-0-50'));
+        gradient.addColorStop(0.357, getStyle('--dba-meter-bg-50-70'));
+        gradient.addColorStop(0.5, getStyle('--dba-meter-bg-70-90'));
+        gradient.addColorStop(0.642, getStyle('--dba-meter-bg-90-140'));
+        drawDbMeterBackground();
+        ctxDbMeter.fillStyle = gradient;
+        ctxDbMeter.fillRect(0, 0, width, h);
+      }
+      function resetDbaValues() {
+        maxDba = -Infinity;
+        dbaValues = [];
+        dbRealtimeValue.textContent = '—';
+        dbAvgValue.textContent = '—';
+        dbMaxValue.textContent = '—';
+      }
+      function loop() {
+        if (!running) return;
+        analyser.getByteTimeDomainData(dataArray);
+        analyser.getByteFrequencyData(freqArray);
+        if (avgChk.checked) {
+          if (!avgBuffer || avgBuffer.length !== freqArray.length) avgBuffer = new Float32Array(freqArray.length);
+          const alpha = 0.5;
+          for (let i = 0; i < freqArray.length; i++) {
+            avgBuffer[i] = alpha * avgBuffer[i] + (1 - alpha) * freqArray[i];
+            freqArray[i] = avgBuffer[i];
+          }
+        }
+        drawFFT();
+        drawOctave();
+        updateRMS();
+        const dbA_value_raw = calculateDba(); 
+        let dbA_value_display = Math.max(0, dbA_value_raw);
+        updateDbMeter(dbA_value_display);
+
+        if (dbaValues.length === 0) {
+          if (dbA_value_display > 0) {
+            dbaValues.push(dbA_value_display);
+            dbRealtimeValue.textContent = `${dbA_value_display.toFixed(1)} dB-A`;
+            dbMaxValue.textContent = `${dbA_value_display.toFixed(1)} dB-A`;
+            dbAvgValue.textContent = `${dbA_value_display.toFixed(1)} dB-A`;
+            maxDba = dbA_value_display;
+          } else {
+            dbRealtimeValue.textContent = '—';
+            dbAvgValue.textContent = '—';
+            dbMaxValue.textContent = '—';
+          }
+        } else {
+          dbRealtimeValue.textContent = `${dbA_value_display.toFixed(1)} dB-A`;
+          if (dbA_value_display > maxDba) {
+            maxDba = dbA_value_display;
+            dbMaxValue.textContent = `${maxDba.toFixed(1)} dB-A`;
+          }
+          if (dbA_value_display > 0) {
+            dbaValues.push(dbA_value_display);
+            if (dbaValues.length > 100) dbaValues.shift();
+          }
+          const sumDba = dbaValues.reduce((a, b) => a + b, 0);
+          const avgDba = sumDba / dbaValues.length;
+          dbAvgValue.textContent = `${avgDba.toFixed(1)} dB-A`;
+        }
+        
+        const now = performance.now();
+        if (heatmapEnabled && (now - lastHeatmapUpdate >= 33)) {
+          drawHeatmap();
+          lastHeatmapUpdate = now;
+        } else if (!heatmapEnabled) {
+          ctxHeatmap.clearRect(0, 0, heatmapCanvas.width, heatmapCanvas.height);
+          drawHeatmapBackground(ctxHeatmap);
+          drawOverlayMessage(ctxHeatmap, heatmapCanvas.width, heatmapCanvas.height);
+        }
+        rafId = requestAnimationFrame(loop);
+      }
+      async function start() {
+        const showErr = (msg) => {
+          const box = document.getElementById('errBox');
+          const msgEl = document.getElementById('errMsg');
+          if (box && msgEl) { box.style.display = 'block'; msgEl.textContent = msg; }
+        };
+        try {
+          btnStart.disabled = true;
+          btnStop.disabled = false;
+
+          if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error('เบราเซอร์ไม่รองรับ getUserMedia');
+          }
+
+          // ขอไมค์แบบพยายามปิด DSP ก่อน ถ้าไม่ได้ค่อย fallback
+          const aggressive = { audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } };
+          let stream = null;
+          try {
+            stream = await navigator.mediaDevices.getUserMedia(aggressive);
+          } catch (_) {
+            stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          }
+
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
+          if (audioCtx.state === 'suspended') await audioCtx.resume();
+          sampleRate = audioCtx.sampleRate;
+          labelRate.textContent = `${Math.round(sampleRate)} Hz`;
+
+          analyser = audioCtx.createAnalyser();
+          analyser.fftSize = parseInt(fftSel.value, 10);
+          analyser.smoothingTimeConstant = parseFloat(smoothing.value);
+
+          micSrc = audioCtx.createMediaStreamSource(stream);
+          micSrc.connect(analyser);
+
+          dataArray = new Uint8Array(analyser.fftSize);
+          freqArray = new Uint8Array(analyser.frequencyBinCount);
+          peakArray = new Uint8Array(analyser.frequencyBinCount);
+
+          bands = genBands(octN);
+          peakOct = new Float32Array(bands.length);
+          heatmapFreqBinMap = genHeatmapBins();
+          heatmapData = [];
+          lastHeatmapUpdate = 0;
+          running = true;
+
+          const box = document.getElementById('errBox');
+          if (box) box.style.display = 'none';
+
+          drawDbMeterBackground();
+          resetDbaValues();
+          loop();
+        } catch (err) {
+          console.error('เปิดไมโครโฟนไม่สำเร็จ:', err);
+          showErr(err && err.message ? err.message : String(err));
+          btnStart.disabled = false;
+          btnStop.disabled = true;
+        }
+      }
+
+      function stop() {
+        running = false;
+        if (rafId) cancelAnimationFrame(rafId);
+        try { micSrc && micSrc.disconnect(); } catch {}
+        try { analyser && analyser.disconnect(); } catch {}
+        if (audioCtx) { audioCtx.close(); }
+        btnStart.disabled = false;
+        btnStop.disabled = true;
+        dbRealtimeValue.textContent = '—';
+        updateDbMeter(-Infinity);
+      }
+      function attachPressGuide(canvas, tipEl, which) {
+        let pressed = false;
+        const getX = (e) => {
+          const rect = canvas.getBoundingClientRect();
+          const xCss = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+          return Math.max(PAD.L, Math.min(canvas.width - PAD.R, xCss * (canvas.width / rect.width)));
+        };
+        const update = (xPx) => {
+          const freq = xToFreq(xPx, canvas.width);
+          const plot = canvas.parentElement.getBoundingClientRect();
+          tipEl.style.display = 'block';
+          tipEl.textContent = fmtHz(freq);
+          const cssX = (xPx / canvas.width) * plot.width;
+          tipEl.style.left = cssX + 'px';
+          tipEl.style.top = '8px';
+          if (which === 'fft') guideFFT = { xPx, freq };
+          else if (which === 'oct') guideOCT = { xPx, freq };
+          else if (which === 'heatmap') {
+            guideHeatmap = { xPx, freq };
