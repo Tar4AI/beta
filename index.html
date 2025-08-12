@@ -105,12 +105,12 @@
 </head>
 <body>
   <div class="wrap">
-    <!-- Error banner (hidden by default) -->
-    <div id="errBox" class="card" style="display:none;border-color:#b91c1c;background:#111317">
-      <b style="color:#fecaca">ไม่สามารถเริ่มวัดได้</b>
-      <div id="errMsg" class="hint" style="color:#fca5a5">—</div>
-    </div>
-    
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <div>
+          <h2 style="margin:0 0 4px 0">my RTAs</h2>
+          <div class="hint">แกน X = Log (20 Hz → 20 kHz) • Heatmap แสดงความถี่ในอดีต</div>
+        </div>
         <div class="row">
           <button id="btnStart">▶️ เริ่มวัด</button>
           <button id="btnStop" class="secondary" disabled>⏸️ หยุด</button>
@@ -381,9 +381,9 @@
         const logFmin = Math.log10(fmin);
         const logFmax = Math.log10(fm);
         const bins = [];
-        for (let i = 0; i < 300; i++) {
-          const logFStart = logFmin + (i / 300) * (logFmax - logFmin);
-          const logFEnd = logFmin + ((i + 1) / 300) * (logFmax - logFmin);
+        for (let i = 0; i < heatmapFreqBins; i++) {
+          const logFStart = logFmin + (i / heatmapFreqBins) * (logFmax - logFmin);
+          const logFEnd = logFmin + ((i + 1) / heatmapFreqBins) * (logFmax - logFmin);
           const fStart = Math.pow(10, logFStart);
           const fEnd = Math.pow(10, logFEnd);
           const binStart = Math.max(0, Math.floor(fStart / fpb));
@@ -611,10 +611,10 @@
           return { db: avgDb, fStart: bin.fStart, fEnd: bin.fEnd };
         });
         heatmapData.unshift(currentData);
-        if (heatmapData.length > 200) {
+        if (heatmapData.length > maxHeatmapData) {
           heatmapData.pop();
         }
-        const timeScale = plotHeatmapH / 200;
+        const timeScale = plotHeatmapH / maxHeatmapData;
         ctxHeatmap.clearRect(0, 0, w, h);
         for (let i = 0; i < heatmapData.length; i++) {
           const y = i * timeScale;
@@ -743,7 +743,7 @@
         }
         
         const now = performance.now();
-        if (heatmapEnabled && (now - lastHeatmapUpdate >= 33)) {
+        if (heatmapEnabled && (now - lastHeatmapUpdate >= HEATMAP_UPDATE_RATE_MS)) {
           drawHeatmap();
           lastHeatmapUpdate = now;
         } else if (!heatmapEnabled) {
@@ -754,65 +754,44 @@
         rafId = requestAnimationFrame(loop);
       }
       async function start() {
-        const showErr = (msg) => {
-          const box = document.getElementById('errBox');
-          const msgEl = document.getElementById('errMsg');
-          if (box && msgEl) { box.style.display = 'block'; msgEl.textContent = msg; }
-        };
         try {
           btnStart.disabled = true;
           btnStop.disabled = false;
-
-          if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            throw new Error('เบราเซอร์ไม่รองรับ getUserMedia');
-          }
-
-          // ขอไมค์แบบพยายามปิด DSP ก่อน ถ้าไม่ได้ค่อย fallback
-          const aggressive = { audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } };
-          let stream = null;
-          try {
-            stream = await navigator.mediaDevices.getUserMedia(aggressive);
-          } catch (_) {
-            stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          }
-
+          const constraints = {
+            audio: {
+              echoCancellation: ec.checked ? false : true,
+              noiseSuppression: ns.checked ? false : true,
+              autoGainControl: agc.checked ? false : true
+            }
+          };
+          const stream = await navigator.mediaDevices.getUserMedia(constraints);
           audioCtx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
           if (audioCtx.state === 'suspended') await audioCtx.resume();
           sampleRate = audioCtx.sampleRate;
           labelRate.textContent = `${Math.round(sampleRate)} Hz`;
-
           analyser = audioCtx.createAnalyser();
           analyser.fftSize = parseInt(fftSel.value, 10);
           analyser.smoothingTimeConstant = parseFloat(smoothing.value);
-
           micSrc = audioCtx.createMediaStreamSource(stream);
           micSrc.connect(analyser);
-
           dataArray = new Uint8Array(analyser.fftSize);
           freqArray = new Uint8Array(analyser.frequencyBinCount);
           peakArray = new Uint8Array(analyser.frequencyBinCount);
-
           bands = genBands(octN);
           peakOct = new Float32Array(bands.length);
           heatmapFreqBinMap = genHeatmapBins();
           heatmapData = [];
           lastHeatmapUpdate = 0;
           running = true;
-
-          const box = document.getElementById('errBox');
-          if (box) box.style.display = 'none';
-
           drawDbMeterBackground();
           resetDbaValues();
           loop();
         } catch (err) {
-          console.error('เปิดไมโครโฟนไม่สำเร็จ:', err);
-          showErr(err && err.message ? err.message : String(err));
+          console.error('เปิดไมโครโฟนไม่สำเร็จ: ' + (err.message || err));
           btnStart.disabled = false;
           btnStop.disabled = true;
         }
       }
-
       function stop() {
         running = false;
         if (rafId) cancelAnimationFrame(rafId);
@@ -843,3 +822,130 @@
           else if (which === 'oct') guideOCT = { xPx, freq };
           else if (which === 'heatmap') {
             guideHeatmap = { xPx, freq };
+            const h = heatmapCanvas.height;
+            const w = heatmapCanvas.width;
+            ctxHeatmap.clearRect(0, 0, w, h);
+            if (heatmapEnabled) {
+                drawHeatmap();
+            } else {
+                drawHeatmapBackground(ctxHeatmap);
+                drawOverlayMessage(ctxHeatmap, w, h);
+            }
+            drawHeatmapGuide(ctxHeatmap, guideHeatmap.xPx, h);
+          }
+        };
+        const clear = () => {
+          pressed = false;
+          tipEl.style.display = 'none';
+          if (which === 'fft') guideFFT = null;
+          else if (which === 'oct') guideOCT = null;
+          else if (which === 'heatmap') {
+            guideHeatmap = null;
+            if (heatmapEnabled) {
+              drawHeatmap();
+            } else {
+              const w = heatmapCanvas.width;
+              const h = heatmapCanvas.height;
+              ctxHeatmap.clearRect(0, 0, w, h);
+              drawHeatmapBackground(ctxHeatmap);
+              drawOverlayMessage(ctxHeatmap, w, h);
+            }
+          }
+        };
+        const onDown = (e) => {
+          pressed = true;
+          e.preventDefault();
+          update(getX(e));
+        };
+        const onMove = (e) => {
+          if (!pressed) return;
+          e.preventDefault();
+          update(getX(e));
+        };
+        const onUp = (_) => {
+          clear();
+        };
+
+        canvas.addEventListener('mousedown', onDown);
+        canvas.addEventListener('mousemove', onMove);
+        canvas.addEventListener('mouseup', onUp);
+        canvas.addEventListener('mouseleave', onUp);
+        canvas.addEventListener('touchstart', onDown, {passive:false});
+        canvas.addEventListener('touchmove', onMove, {passive:false});
+        canvas.addEventListener('touchend', onUp);
+      }
+      function drawHeatmapBackground(ctx) {
+        const {width: w, height: h} = ctx.canvas;
+        const plotH = h - PAD.B;
+        ctx.clearRect(0, 0, w, h);
+        ctx.strokeStyle = FRAME;
+        ctx.strokeRect(PAD.L, 0, w - PAD.L - PAD.R, plotH);
+        ctx.fillStyle = LABEL;
+        ctx.font = '12px system-ui';
+        ctx.textBaseline = 'alphabetic';
+        [31.5, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000].forEach(t => {
+          const x = mapLogX(t, w);
+          ctx.fillText(t >= 1000 ? (t / 1000) + 'k' : t, x - 8, h - LABEL_Y);
+        });
+      }
+      btnStart.onclick = start;
+      btnStop.onclick = stop;
+      btnHold.onclick = () => {
+        holdEnabled = !holdEnabled;
+        btnHold.setAttribute('aria-pressed', holdEnabled);
+        btnHold.textContent = `📌 Hold Peak: ${holdEnabled ? 'ON' : 'OFF'}`;
+      };
+      btnClear.onclick = () => {
+        if (peakArray) peakArray.fill(0);
+        if (peakOct) peakOct.fill(0);
+        if (running) {
+          drawFFT();
+          drawOctave();
+        }
+      };
+      btnToggleHeatmap.onclick = () => {
+        heatmapEnabled = !heatmapEnabled;
+        btnToggleHeatmap.setAttribute('aria-pressed', heatmapEnabled);
+        btnToggleHeatmap.textContent = `🔥 Heatmap: ${heatmapEnabled ? 'ON' : 'OFF'}`;
+        if (running) {
+          if (heatmapEnabled) {
+            heatmapData = [];
+            lastHeatmapUpdate = 0;
+          }
+          drawHeatmap();
+        } else {
+          const w = heatmapCanvas.width;
+          const h = heatmapCanvas.height;
+          ctxHeatmap.clearRect(0, 0, w, h);
+          drawHeatmapBackground(ctxHeatmap);
+          if (!heatmapEnabled) {
+            drawOverlayMessage(ctxHeatmap, w, h);
+          }
+        }
+      };
+      fftSel.onchange = () => {
+        if (analyser) {
+          stop();
+          start();
+        }
+      };
+      octResSel.onchange = () => {
+        octN = parseInt(octResSel.value, 10);
+        bands = genBands(octN);
+      };
+      calibrationInput.onchange = () => {
+        calibrationOffset = parseFloat(calibrationInput.value) || 0;
+      };
+      btnResetDba.onclick = resetDbaValues;
+      attachPressGuide(fftCanvas, fftTip, 'fft');
+      attachPressGuide(octCanvas, octTip, 'oct');
+      attachPressGuide(heatmapCanvas, heatmapTip, 'heatmap');
+      drawBackground(ctxFFT);
+      drawBackground(ctxOct);
+      drawHeatmapBackground(ctxHeatmap);
+      drawOverlayMessage(ctxHeatmap, heatmapCanvas.width, heatmapCanvas.height);
+      updateDbMeter(-Infinity);
+    })();
+  </script>
+</body>
+</html>
