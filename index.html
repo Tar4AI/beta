@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#1a202c" media="(prefers-color-scheme: dark)" />
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Mobile RTA (FFT/Oct/Heatmap + dB-A)</title>
+  <title>Mobile RTA (FFT/Oct/Heatmap + dB)</title>
 
   <style>
     :root{
@@ -189,7 +189,7 @@
 
       <div class="card">
         <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:2px">
-          <b>ความดังรวม dB-A</b>
+          <b>ความดังรวม dB</b>
           <button id="btnResetDba" class="secondary" style="font-size:12px;padding:6px 10px;">♻️ Reset AVG/MAX</button>
         </div>
         <div id="dbMeterContainer">
@@ -201,9 +201,9 @@
           <span class="dbLabel" style="right:0">140</span>
         </div>
         <div class="dba-values-row" style="margin-top:12px;">
-          <div class="kv-item"><b>Realtime (dB-A)</b><span id="dbRealtimeValue">—</span></div>
-          <div class="kv-item"><b>AVG (dB-A)</b><span id="dbAvgValue">—</span></div>
-          <div class="kv-item"><b>MAX (dB-A)</b><span id="dbMaxValue">—</span></div>
+          <div class="kv-item"><b>Realtime (dB)</b><span id="dbRealtimeValue">—</span></div>
+          <div class="kv-item"><b>AVG (dB)</b><span id="dbAvgValue">—</span></div>
+          <div class="kv-item"><b>MAX (dB)</b><span id="dbMaxValue">—</span></div>
         </div>
       </div>
     </div>
@@ -316,8 +316,11 @@
     let dbaValues=[];
 
     // Dynamic range
-    let octRangeMax=parseInt(octRangePreset.value,10);
-    let heatmapRangeMax=parseInt(heatmapRangePreset.value,10);
+    let octRangeMax, heatmapRangeMax; // Declare without assigning, then assign from presets.
+
+    // Assign initial values from presets
+    octRangeMax=parseInt(octRangePreset.value,10);
+    heatmapRangeMax=parseInt(heatmapRangePreset.value,10);
 
     // ===== Freq helpers =====
     const fmax=()=>Math.min(sampleRate/2,20000);
@@ -444,11 +447,36 @@
       if(guideHeatmap) drawHeatmapGuide(ctxHeatmap,guideHeatmap.xPx,h);
     }
 
+    function drawHeatmapBackground(ctx){
+      const {width:w,height:h}=ctx.canvas;
+      const plotH=h-PAD.B;
+      ctx.clearRect(0,0,w,h);
+      ctx.strokeStyle=FRAME;
+      ctx.strokeRect(PAD.L,0,w-PAD.L-PAD.R,plotH);
+      ctx.fillStyle=LABEL;
+      ctx.font='12px system-ui';
+      ctx.textBaseline='alphabetic';
+      [31.5,63,125,250,500,1000,2000,4000,8000,16000].forEach(t=>{
+        const x=mapLogX(t,w);
+        ctx.fillText(t>=1000?(t/1000)+'k':t,x-8,h-LABEL_Y);
+      });
+    }
+
     function updateRMS(){ if(!dataArray) return; let sum=0; for(let i=0;i<dataArray.length;i++){const v=(dataArray[i]-128)/128; sum+=v*v;} const rms=Math.sqrt(sum/dataArray.length); rmsEl.textContent=(20*Math.log10(rms+1e-12)).toFixed(1)+' dBFS'; }
     function calculateDba(){ if(!freqArray||!analyser) return -Infinity; const N=freqArray.length, fpb=sampleRate/analyser.fftSize; let sum=0; for(let i=0;i<N;i++){const f=i*fpb; const aw=Math.pow(10,aWeighting(f)/20); const v=freqArray[i]*aw; sum+=v*v;} const rms=Math.sqrt(sum/N); const dbfsValue=20*Math.log10(rms/255+1e-12); return dbfsValue+calibrationOffset; }
     function drawDbMeterBackground(){const {width:w,height:h}=ctxDbMeter.canvas; ctxDbMeter.clearRect(0,0,w,h);}
     function updateDbMeter(db){const {width:w,height:h}=ctxDbMeter.canvas; const dbMin=0,dbMax=140; const fillW=w*clamp01((db-dbMin)/(dbMax-dbMin)); const g=ctxDbMeter.createLinearGradient(0,0,w,0); g.addColorStop(0,getStyle('--dba-meter-bg-0-50')); g.addColorStop(.357,getStyle('--dba-meter-bg-50-70')); g.addColorStop(.5,getStyle('--dba-meter-bg-70-90')); g.addColorStop(.642,getStyle('--dba-meter-bg-90-140')); drawDbMeterBackground(); ctxDbMeter.fillStyle=g; ctxDbMeter.fillRect(0,0,fillW,h); }
     function resetDbaValues(){maxDba=-Infinity; dbaValues=[]; dbRealtimeValue.textContent='—'; dbAvgValue.textContent='—'; dbMaxValue.textContent='—';}
+
+    
+    function updateHeatmapRangeText(){
+      heatmapRangeText.textContent = `0 to -${heatmapRangeMax} dBFS`;
+    }
+    
+    function updateOctaveRangeText(){
+      octRangeText.textContent = `0–${octRangeMax}`;
+    }
+
 
     // ===== Loop =====
     function loop(){
@@ -461,8 +489,8 @@
       }
       drawFFT(); drawOctave(); updateRMS();
       const dbAraw=calculateDba(), dbAdisp=Math.max(0,dbAraw); updateDbMeter(dbAdisp);
-      if(dbaValues.length===0){ if(dbAdisp>0){dbaValues.push(dbAdisp); dbRealtimeValue.textContent=`${dbAdisp.toFixed(1)} dB-A`; dbAvgValue.textContent=dbMaxValue.textContent=`${dbAdisp.toFixed(1)} dB-A`; maxDba=dbAdisp;} else {dbRealtimeValue.textContent='—'; dbAvgValue.textContent='—'; dbMaxValue.textContent='—';}}
-      else{ dbRealtimeValue.textContent=`${dbAdisp.toFixed(1)} dB-A`; if(dbAdisp>maxDba){maxDba=dbAdisp; dbMaxValue.textContent=`${maxDba.toFixed(1)} dB-A`;} if(dbAdisp>0){dbaValues.push(dbAdisp); if(dbaValues.length>100) dbaValues.shift();} const avg=dbaValues.reduce((a,b)=>a+b,0)/dbaValues.length; dbAvgValue.textContent=`${avg.toFixed(1)} dB-A`; }
+      if(dbaValues.length===0){ if(dbAdisp>0){dbaValues.push(dbAdisp); dbRealtimeValue.textContent=`${dbAdisp.toFixed(1)} dB`; dbAvgValue.textContent=dbMaxValue.textContent=`${dbAdisp.toFixed(1)} dB`; maxDba=dbAdisp;} else {dbRealtimeValue.textContent='—'; dbAvgValue.textContent='—'; dbMaxValue.textContent='—';}}
+      else{ dbRealtimeValue.textContent=`${dbAdisp.toFixed(1)} dB`; if(dbAdisp>maxDba){maxDba=dbAdisp; dbMaxValue.textContent=`${maxDba.toFixed(1)} dB`;} if(dbAdisp>0){dbaValues.push(dbAdisp); if(dbaValues.length>100) dbaValues.shift();} const avg=dbaValues.reduce((a,b)=>a+b,0)/dbaValues.length; dbAvgValue.textContent=`${avg.toFixed(1)} dB`; }
       const now=performance.now(); if(heatmapEnabled && (now-lastHeatmapUpdate>=HEATMAP_UPDATE_MS)){drawHeatmap(); lastHeatmapUpdate=now;} else if(!heatmapEnabled){ctxHeatmap.clearRect(0,0,heatmapCanvas.width,heatmapCanvas.height); drawHeatmapBackground(ctxHeatmap); drawOverlayMessage(ctxHeatmap,heatmapCanvas.width,heatmapCanvas.height);}
       rafId=requestAnimationFrame(loop);
     }
@@ -506,29 +534,6 @@
       const onUp=()=>clear();
       canvas.addEventListener('mousedown',onDown); canvas.addEventListener('mousemove',onMove); canvas.addEventListener('mouseup',onUp); canvas.addEventListener('mouseleave',onUp);
       canvas.addEventListener('touchstart',onDown,{passive:false}); canvas.addEventListener('touchmove',onMove,{passive:false}); canvas.addEventListener('touchend',onUp);
-    }
-
-    function drawHeatmapBackground(ctx){
-      const {width:w,height:h}=ctx.canvas;
-      const plotH=h-PAD.B;
-      ctx.clearRect(0,0,w,h);
-      ctx.strokeStyle=FRAME;
-      ctx.strokeRect(PAD.L,0,w-PAD.L-PAD.R,plotH);
-      ctx.fillStyle=LABEL;
-      ctx.font='12px system-ui';
-      ctx.textBaseline='alphabetic';
-      [31.5,63,125,250,500,1000,2000,4000,8000,16000].forEach(t=>{
-        const x=mapLogX(t,w);
-        ctx.fillText(t>=1000?(t/1000)+'k':t,x-8,h-LABEL_Y);
-      });
-    }
-
-    function updateHeatmapRangeText(){
-      heatmapRangeText.textContent = `0 to -${heatmapRangeMax} dBFS`;
-    }
-    
-    function updateOctaveRangeText(){
-      octRangeText.textContent = `0–${octRangeMax}`;
     }
 
     // Event listeners
