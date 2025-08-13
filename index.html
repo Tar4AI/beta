@@ -225,9 +225,10 @@
       constructor() {
         this.PAD = { L: 40, R: 10, T: 10, B: 32 };
         this.LABEL_Y = 10;
-        this.HEATMAP_UPDATE_MS = 33;
-        this.HEATMAP_FREQ_BINS = 300;
         this.HEATMAP_TIME_SLICES = 200;
+        // NEW: Define resolutions for HD and SD modes
+        this.HEATMAP_BINS_HD = 300;
+        this.HEATMAP_BINS_SD = 120;
 
         this.colors = {
           gridH: this.getStyle('--gridH'), gridV: this.getStyle('--gridV'),
@@ -255,11 +256,10 @@
           holdEnabled: true,
           heatmapEnabled: false,
           heatmapIsHD: true,
-          frameCount: 0, // NEW: Frame counter for SD mode
           peakArray: null, peakOct: null,
           avgBuffer: null,
           octN: 12, bands: [],
-          heatmapData: [], heatmapFreqBinMap: null, lastHeatmapUpdate: 0,
+          heatmapData: [], heatmapFreqBinMap: null,
           calibrationOffset: 100,
           maxDba: -Infinity, dbaValues: [],
           octRangeMax: 255, heatmapRangeMax: 50,
@@ -320,6 +320,8 @@
           this.state.heatmapIsHD = !this.state.heatmapIsHD;
           this.dom.btnHeatmapQuality.setAttribute('aria-pressed', this.state.heatmapIsHD);
           this.dom.btnHeatmapQuality.textContent = this.state.heatmapIsHD ? '🔥 HD' : '⚡️ SD';
+          // Regenerate bins with new resolution and clear data
+          this.state.heatmapFreqBinMap = this.genHeatmapBins();
           this.state.heatmapData = [];
           if (this.state.heatmapEnabled) {
               this.drawHeatmap(true);
@@ -520,13 +522,8 @@
         this.updateRMS();
         this.updateDba();
 
-        const now = performance.now();
-        if (this.state.heatmapEnabled && (now - this.state.lastHeatmapUpdate >= this.HEATMAP_UPDATE_MS)) {
-          this.state.frameCount++;
-          if (this.state.heatmapIsHD || this.state.frameCount % 3 === 0) {
-            this.drawHeatmap();
-          }
-          this.state.lastHeatmapUpdate = now;
+        if (this.state.heatmapEnabled) {
+          this.drawHeatmap();
         }
 
         this.state.rafId = requestAnimationFrame(() => this.loop());
@@ -566,12 +563,13 @@
 
       genHeatmapBins() {
         if (!this.state.analyser) return null;
+        const numBins = this.state.heatmapIsHD ? this.HEATMAP_BINS_HD : this.HEATMAP_BINS_SD;
         const fm = this.fmax(), fpb = this.state.sampleRate / this.state.analyser.fftSize, fmin = 20;
         const logFmin = Math.log10(fmin), logFmax = Math.log10(fm);
         const bins = [];
-        for (let i = 0; i < this.HEATMAP_FREQ_BINS; i++) {
-          const logFs = logFmin + (i / this.HEATMAP_FREQ_BINS) * (logFmax - logFmin);
-          const logFe = logFmin + ((i + 1) / this.HEATMAP_FREQ_BINS) * (logFmax - logFmin);
+        for (let i = 0; i < numBins; i++) {
+          const logFs = logFmin + (i / numBins) * (logFmax - logFmin);
+          const logFe = logFmin + ((i + 1) / numBins) * (logFmax - logFmin);
           const fStart = Math.pow(10, logFs), fEnd = Math.pow(10, logFe);
           const binStart = Math.max(0, Math.floor(fStart / fpb));
           const binEnd = Math.min(this.state.analyser.frequencyBinCount - 1, Math.ceil(fEnd / fpb));
@@ -846,3 +844,4 @@
   </script>
 </body>
 </html>
+" and the query is "ลองวิธีนี
