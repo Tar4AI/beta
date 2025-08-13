@@ -621,13 +621,13 @@
           }
           ctx.save(); ctx.globalAlpha = .35; ctx.strokeStyle = this.colors.peak; ctx.lineWidth = 1.25; ctx.stroke(); ctx.restore();
           let peakBin = 0, peakVal = -Infinity; for (let i = 0; i < N; i++) if (this.state.freqArray[i] > peakVal) { peakVal = this.state.freqArray[i]; peakBin = i; }
-          const peakFreqNow = peakBin * fpb; const peakDbNow = this.dbfs(peakVal || 0);
+          const peakFreqNow = peakBin * fpb;
           this.dom.peak.textContent = this.fmtHz(peakFreqNow);
-          this.dom.fftPeakText.textContent = `Peak: ${this.fmtHz(peakFreqNow)} • ${peakDbNow.toFixed(1)} dBFS`;
+          this.dom.fftPeakText.textContent = `Peak: ${this.fmtHz(peakFreqNow)}`;
           let holdBin = 0, holdVal = 0; for (let i = 0; i < N; i++) if (this.state.peakArray[i] > holdVal) { holdVal = this.state.peakArray[i]; holdBin = i; }
           if (holdVal > 0) {
               this.dom.fftHoldText.style.display = '';
-              this.dom.fftHoldText.textContent = `Hold: ${this.fmtHz(holdBin * fpb)} • ${this.dbfs(holdVal).toFixed(1)} dBFS`;
+              this.dom.fftHoldText.textContent = `Hold: ${this.fmtHz(holdBin * fpb)}`;
               this.drawPeakLine(ctx, this.mapLogX(holdBin * fpb, plotW), plotH, this.colors.hold, true);
           } else {
               this.dom.fftHoldText.style.display = 'none';
@@ -673,10 +673,10 @@
           ctx.save(); ctx.globalAlpha = .45; ctx.strokeStyle = this.colors.hold; ctx.lineWidth = 1.5; ctx.stroke(); ctx.restore();
           let idxNow = 0, vNow = -1; for (let i = 0; i < vals.length; i++) if (vals[i] > vNow) { vNow = vals[i]; idxNow = i; }
           let idxHold = 0, vHold = 0; for (let i = 0; i < this.state.peakOct.length; i++) if (this.state.peakOct[i] > vHold) { vHold = this.state.peakOct[i]; idxHold = i; }
-          this.dom.octPeakText.textContent = `Peak: ${this.fmtHz(this.state.bands[idxNow].fc)} • ${vNow.toFixed(1)} / ${this.state.octRangeMax}`;
+          this.dom.octPeakText.textContent = `Peak: ${this.fmtHz(this.state.bands[idxNow].fc)}`;
           if (vHold > 0) {
               this.dom.octHoldText.style.display = '';
-              this.dom.octHoldText.textContent = `Hold: ${this.fmtHz(this.state.bands[idxHold].fc)} • ${vHold.toFixed(1)} / ${this.state.octRangeMax}`;
+              this.dom.octHoldText.textContent = `Hold: ${this.fmtHz(this.state.bands[idxHold].fc)}`;
               this.drawPeakLine(ctx, this.mapLogX(this.state.bands[idxHold].fc, plotW), plotH, this.colors.hold, true);
           } else {
               this.dom.octHoldText.style.display = 'none';
@@ -774,13 +774,12 @@
           const fillW = plotW * this.clamp01((db - dbMin) / (dbMax - dbMin));
           const g = ctx.createLinearGradient(0, 0, plotW, 0);
           
-          // UPDATED: New gradient stops for a more natural progression
-          g.addColorStop(0, this.colors.dbMeter.green);      // Start green
-          g.addColorStop(0.357, this.colors.dbMeter.green);  // End green at 50dB (50/140)
-          g.addColorStop(0.571, this.colors.dbMeter.yellow); // Transition to yellow by 80dB (80/140)
-          g.addColorStop(0.714, this.colors.dbMeter.orange); // Transition to orange by 100dB (100/140)
-          g.addColorStop(0.785, this.colors.dbMeter.red);   // Transition to red by 110dB (110/140)
-          g.addColorStop(1, this.colors.dbMeter.red);        // End with red
+          g.addColorStop(0, this.colors.dbMeter.green);
+          g.addColorStop(0.357, this.colors.dbMeter.green);
+          g.addColorStop(0.571, this.colors.dbMeter.yellow);
+          g.addColorStop(0.714, this.colors.dbMeter.orange);
+          g.addColorStop(0.785, this.colors.dbMeter.red);
+          g.addColorStop(1, this.colors.dbMeter.red);
           
           this.drawDbMeterBackground();
           ctx.fillStyle = g;
