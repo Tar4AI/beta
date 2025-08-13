@@ -17,7 +17,10 @@
       --fft:#68d391; --peak:#b794f4; --hold:#f6ad55; --bar:#68d391;
       --heatmap-color-1:#1a202c; --heatmap-color-2:#4a5568; --heatmap-color-3:#68d391;
       --heatmap-color-4:#f6ad55; --heatmap-color-5:#e53e3e;
-      --dba-meter-bg-0-50:#48bb78; --dba-meter-bg-50-70:#f6ad55; --dba-meter-bg-70-90:#e53e3e; --dba-meter-bg-90-140:#c53030;
+      --dba-meter-bg-green: #48bb78;
+      --dba-meter-bg-yellow: #f6ad55;
+      --dba-meter-bg-orange: #ed8936;
+      --dba-meter-bg-red: #e53e3e;
     }
     :root{ color-scheme:dark }
     html{ background:#1a202c }
@@ -239,10 +242,12 @@
             this.getStyle('--heatmap-color-3'), this.getStyle('--heatmap-color-4'),
             this.getStyle('--heatmap-color-5')
           ],
-          dbMeter: [
-            this.getStyle('--dba-meter-bg-0-50'), this.getStyle('--dba-meter-bg-50-70'),
-            this.getStyle('--dba-meter-bg-70-90'), this.getStyle('--dba-meter-bg-90-140')
-          ]
+          dbMeter: {
+            green: this.getStyle('--dba-meter-bg-green'),
+            yellow: this.getStyle('--dba-meter-bg-yellow'),
+            orange: this.getStyle('--dba-meter-bg-orange'),
+            red: this.getStyle('--dba-meter-bg-red')
+          }
         };
 
         this.dom = this.getDOMElements();
@@ -259,7 +264,7 @@
           avgBuffer: null,
           octN: 12, bands: [],
           heatmapData: [], heatmapFreqBinMap: null,
-          lastHeatmapUpdate: 0, // Used for throttling heatmap updates
+          lastHeatmapUpdate: 0,
           calibrationOffset: 100,
           maxDba: -Infinity, dbaValues: [],
           octRangeMax: 255, heatmapRangeMax: 50,
@@ -391,14 +396,9 @@
         for (const key in this.canvases) {
             if (!this.canvases[key] || !this.canvases[key].canvas) continue;
             const { canvas, ctx } = this.canvases[key];
-            const parentEl = canvas.parentElement;
-            if (!parentEl) continue;
-
-            const rect = parentEl.getBoundingClientRect();
             
-            canvas.style.width = `${rect.width}px`;
-            canvas.style.height = `${rect.height}px`;
-
+            const rect = canvas.getBoundingClientRect();
+            
             canvas.width = rect.width * dpr;
             canvas.height = rect.height * dpr;
             
@@ -521,7 +521,6 @@
         this.updateRMS();
         this.updateDba();
 
-        // FIXED: Re-introduced time-based throttling for heatmap
         const now = performance.now();
         if (this.state.heatmapEnabled && (now - this.state.lastHeatmapUpdate >= 33)) {
           this.drawHeatmap();
@@ -765,6 +764,7 @@
       updateRMS() { if (!this.state.dataArray) return; let sum = 0; for (let i = 0; i < this.state.dataArray.length; i++) { const v = (this.state.dataArray[i] - 128) / 128; sum += v * v; } const rms = Math.sqrt(sum / this.state.dataArray.length); this.dom.rms.textContent = (20 * Math.log10(rms + 1e-12)).toFixed(1) + ' dBFS'; }
       calculateDba() { if (!this.state.freqArray || !this.state.analyser) return -Infinity; const N = this.state.freqArray.length, fpb = this.state.sampleRate / this.state.analyser.fftSize; let sum = 0; for (let i = 0; i < N; i++) { const f = i * fpb; const aw = Math.pow(10, this.aWeighting(f) / 20); const v = this.state.freqArray[i] * aw; sum += v * v; } const rms = Math.sqrt(sum / N); const dbfsValue = 20 * Math.log10(rms / 255 + 1e-12); return dbfsValue + this.state.calibrationOffset; }
       drawDbMeterBackground() { const { ctx } = this.canvases.dbMeter; const { width: w, height: h } = ctx.canvas; ctx.clearRect(0, 0, w, h); }
+      
       updateDbMeter(db) {
           const { ctx } = this.canvases.dbMeter;
           const { width: w, height: h } = ctx.canvas;
@@ -773,12 +773,20 @@
           const dbMin = 0, dbMax = 140;
           const fillW = plotW * this.clamp01((db - dbMin) / (dbMax - dbMin));
           const g = ctx.createLinearGradient(0, 0, plotW, 0);
-          g.addColorStop(0, this.colors.dbMeter[0]); g.addColorStop(.357, this.colors.dbMeter[1]);
-          g.addColorStop(.5, this.colors.dbMeter[2]); g.addColorStop(.642, this.colors.dbMeter[3]);
+          
+          // UPDATED: New gradient stops for a more natural progression
+          g.addColorStop(0, this.colors.dbMeter.green);      // Start green
+          g.addColorStop(0.357, this.colors.dbMeter.green);  // End green at 50dB (50/140)
+          g.addColorStop(0.571, this.colors.dbMeter.yellow); // Transition to yellow by 80dB (80/140)
+          g.addColorStop(0.714, this.colors.dbMeter.orange); // Transition to orange by 100dB (100/140)
+          g.addColorStop(0.785, this.colors.dbMeter.red);   // Transition to red by 110dB (110/140)
+          g.addColorStop(1, this.colors.dbMeter.red);        // End with red
+          
           this.drawDbMeterBackground();
           ctx.fillStyle = g;
           ctx.fillRect(0, 0, fillW, plotH);
       }
+
       updateDba() {
           const dbAraw = this.calculateDba(), dbAdisp = Math.max(0, dbAraw);
           this.updateDbMeter(dbAdisp);
