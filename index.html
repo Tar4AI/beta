@@ -22,7 +22,7 @@
       --dba-meter-bg-yellow: #f6ad55;
       --dba-meter-bg-orange: #ed8936;
       --dba-meter-bg-red: #e53e3e;
-      --accent-color: #48bb78;
+      --accent-color: #2DD4BF; /* Teal */
     }
 
     /* --- Theme: Studio Blue --- */
@@ -30,14 +30,14 @@
       --bg1:#0F172A; --bg2:#1E293B; --card:#1E293B; --text:#E2E8F0; --muted:#64748B;
       --gridH:rgba(255,255,255,.1); --gridV:rgba(255,255,255,.05);
       --frame:rgba(255,255,255,.12); --label:rgba(255,255,255,.7);
-      --fft:#22D3EE; --peak:#A78BFA; --hold:#F472B6; --bar:#22D3EE;
+      --fft:#22D3EE; --peak:#A5B4FC; --hold:#F472B6; --bar:#22D3EE;
       --heatmap-color-1:#0F172A; --heatmap-color-2:#334155; --heatmap-color-3:#0EA5E9;
       --heatmap-color-4:#A78BFA; --heatmap-color-5:#F472B6;
       --dba-meter-bg-green: #22D3EE;
       --dba-meter-bg-yellow: #A78BFA;
       --dba-meter-bg-orange: #EC4899;
       --dba-meter-bg-red: #F43F5E;
-      --accent-color: #22D3EE;
+      --accent-color: #60A5FA; /* Slate Blue */
     }
 
     /* --- Theme: Vintage Amber --- */
@@ -47,12 +47,12 @@
       --frame:rgba(255,250,235,.12); --label:rgba(255,250,235,.7);
       --fft:#F59E0B; --peak:#FDE68A; --hold:#FDBA74; --bar:#F59E0B;
       --heatmap-color-1:#292524; --heatmap-color-2:#78716C; --heatmap-color-3:#F59E0B;
-      --heatmap-color-4:#EF4444; --heatmap-color-5:#FBBF24;
+      --heatmap-color-4:#FBBF24; --heatmap-color-5:#EF4444; /* Swapped red to be the loudest */
       --dba-meter-bg-green: #F59E0B;
       --dba-meter-bg-yellow: #FACC15;
       --dba-meter-bg-orange: #FB923C;
       --dba-meter-bg-red: #EF4444;
-      --accent-color: #F59E0B;
+      --accent-color: #D97706; /* Burnt Orange */
     }
 
     :root{ color-scheme:dark }
@@ -130,14 +130,6 @@
       </div>
 
       <div class="row" style="margin-top:8px">
-        <label>FFT Size
-          <select id="fft">
-            <option value="2048">2048</option>
-            <option value="4096" selected>4096</option>
-            <option value="8192">8192</option>
-            <option value="16384">16384</option>
-          </select>
-        </label>
         <label> Smoothing <input id="smoothing" type="range" min="0" max="0.95" step="0.01" value="0.75"></label>
         <label> Averaging <input id="avg" type="checkbox" checked></label>
         <label> A-weighting (เดโม่) <input id="aWeight" type="checkbox"></label>
@@ -165,10 +157,23 @@
     <div class="meters">
       <div class="card">
         <div class="row" style="justify-content:space-between;align-items:center;">
-          <b>RTA แบบละเอียด (FFT, Log Frequency)</b>
-          <div class="badges">
+          <div class="row">
+            <b>RTA แบบ FFT - Log</b>
+          </div>
+          <div class="badges" style="margin-left: auto; margin-right: auto;">
             <span class="badge" id="fftPeakText">Peak: —</span>
             <span class="badge" id="fftHoldText" style="display:none;">Hold: —</span>
+          </div>
+          <div class="row">
+            <label>FFT Size
+              <input id="fftRangeSlider" type="range" min="0" max="3" step="1" value="1">
+              <select id="fftSizePreset">
+                <option value="2048">2048</option>
+                <option value="4096" selected>4096</option>
+                <option value="8192">8192</option>
+                <option value="16384">16384</option>
+              </select>
+            </label>
           </div>
         </div>
         <div class="plot">
@@ -179,7 +184,19 @@
 
       <div class="card">
         <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:2px">
-          <b id="octTitle">RTA แบบ 1/12 Octave (Linear Axis)</b>
+          <div class="row">
+            <b>RTA แบบ</b>
+            <select id="octRes">
+              <option value="3">1/3</option>
+              <option value="6">1/6</option>
+              <option value="12" selected>1/12</option>
+            </select>
+            <b id="octTitle">Octave Linear</b>
+          </div>
+          <div class="badges" style="margin-left: auto; margin-right: auto;">
+            <span class="badge" id="octPeakText">Peak: —</span>
+            <span class="badge" id="octHoldText" style="display:none;">Hold: —</span>
+          </div>
           <div class="row">
             <label style="display:flex;align-items:center;gap:6px">Range (dbFS)
               <input id="octRangeSlider" type="range" min="64" max="1023" step="1" value="255" aria-label="Octave bar range">
@@ -190,20 +207,7 @@
               </select>
             </label>
             <span class="hint" id="octRangeText">0–255</span>
-            <span class="row" style="gap:10px;align-items:center; margin-left: auto;">
-              <label>Octave
-                <select id="octRes">
-                  <option value="3">1/3</option>
-                  <option value="6">1/6</option>
-                  <option value="12" selected>1/12</option>
-                </select>
-              </label>
-            </span>
           </div>
-        </div>
-        <div class="badges">
-          <span class="badge" id="octPeakText">Peak: —</span>
-          <span class="badge" id="octHoldText" style="display:none;">Hold: —</span>
         </div>
         <div class="plot">
           <canvas id="octCanvas"></canvas>
@@ -213,7 +217,16 @@
 
       <div class="card" id="heatmapCard">
         <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:2px">
-          <b id="heatmapTitle">Spectrogram / Heatmap</b>
+          <div class="row">
+            <b id="heatmapTitle">Spectrogram</b>
+            <button id="btnToggleHeatmap" class="ghost" aria-pressed="false">OFF</button>
+            <!-- ปุ่มคุณภาพ Spectrogram: ตัดไอคอนออก -->
+            <button id="btnHeatmapQuality" class="ghost" aria-pressed="true">HD</button>
+          </div>
+          <div class="badges" style="margin-left: auto; margin-right: auto;">
+            <span class="badge" id="heatmapAthText">ATH: —</span>
+            <button id="btnClearAth" class="ghost" style="font-size:12px;padding:4px 8px; margin-left:4px;">Clear</button>
+          </div>
           <div class="row">
             <label style="display:flex;align-items:center;gap:6px">Range (dB)
               <input id="heatmapRangeSlider" type="range" min="5" max="100" step="5" value="50" aria-label="Heatmap range">
@@ -222,11 +235,8 @@
                 <option value="50" selected>50</option> <option value="60">60</option> <option value="80">80</option> <option value="100">100</option>
               </select>
             </label>
-            <span class="hint" id="heatmapRangeText">0 to -50 dBFS</span>
-          </div>
-          <div class="row">
-            <button id="btnToggleHeatmap" class="ghost" aria-pressed="false">Heatmap: OFF</button>
-            <button id="btnHeatmapQuality" class="ghost" aria-pressed="true">🔥 HD</button>
+            <!-- ลบ "0 to" ออก -->
+            <span class="hint" id="heatmapRangeText">-50 dBFS</span>
           </div>
         </div>
         <div class="plot">
@@ -278,6 +288,7 @@
         this.HEATMAP_TIME_SLICES = 200;
         this.HEATMAP_BINS_HD = 300;
         this.HEATMAP_BINS_SD = 60;
+        this.FFT_SIZES = [2048, 4096, 8192, 16384];
 
         this.dom = this.getDOMElements();
         this.colors = {};
@@ -290,7 +301,8 @@
           holdEnabled: true,
           heatmapEnabled: false,
           heatmapIsHD: true,
-          peakArray: null, peakOct: null,
+          peakArray: null, peakOct: null, 
+          athHeatmap: { value: -Infinity, bin: 0 },
           avgBuffer: null,
           octN: 12, bands: [],
           heatmapData: [], heatmapFreqBinMap: null,
@@ -317,9 +329,9 @@
 
       getDOMElements() {
         const ids = [
-          'btnStart', 'btnStop', 'btnHold', 'btnClear', 'btnToggleHeatmap', 'btnHeatmapQuality', 'btnResetDba',
-          'fft', 'smoothing', 'avg', 'aWeight', 'ec', 'ns', 'agc', 'themeSelector',
-          'fftPeakText', 'fftHoldText', 'octPeakText', 'octHoldText',
+          'btnStart', 'btnStop', 'btnHold', 'btnClear', 'btnToggleHeatmap', 'btnHeatmapQuality', 'btnResetDba', 'btnClearAth',
+          'fftSizePreset', 'smoothing', 'avg', 'aWeight', 'ec', 'ns', 'agc', 'themeSelector', 'fftRangeSlider',
+          'fftPeakText', 'fftHoldText', 'octPeakText', 'octHoldText', 'heatmapAthText',
           'fftCanvas', 'octCanvas', 'heatmapCanvas', 'dbMeterCanvas',
           'fftTip', 'octTip', 'heatmapTip',
           'dbRealtimeValue', 'dbAvgValue', 'dbMaxValue',
@@ -348,14 +360,15 @@
         this.dom.btnToggleHeatmap.addEventListener('click', () => {
           this.state.heatmapEnabled = !this.state.heatmapEnabled;
           this.dom.btnToggleHeatmap.setAttribute('aria-pressed', this.state.heatmapEnabled);
-          this.dom.btnToggleHeatmap.textContent = `Heatmap: ${this.state.heatmapEnabled ? 'ON' : 'OFF'}`;
+          this.dom.btnToggleHeatmap.textContent = this.state.heatmapEnabled ? 'ON' : 'OFF';
           if (!this.state.heatmapEnabled) this.drawHeatmapOverlay();
         });
         
+        // เปลี่ยนข้อความปุ่ม HD/SD ให้ไม่มีอีโมจิ
         this.dom.btnHeatmapQuality.addEventListener('click', () => {
           this.state.heatmapIsHD = !this.state.heatmapIsHD;
           this.dom.btnHeatmapQuality.setAttribute('aria-pressed', this.state.heatmapIsHD);
-          this.dom.btnHeatmapQuality.textContent = this.state.heatmapIsHD ? '🔥 HD' : '⚡️ SD';
+          this.dom.btnHeatmapQuality.textContent = this.state.heatmapIsHD ? 'HD' : 'SD';
           this.state.heatmapFreqBinMap = this.genHeatmapBins();
           this.state.heatmapData = [];
           if (this.state.heatmapEnabled) {
@@ -365,9 +378,26 @@
           }
         });
 
+        this.dom.btnClearAth.addEventListener('click', () => {
+            this.state.athHeatmap = { value: -Infinity, bin: 0 };
+            this.dom.heatmapAthText.textContent = 'ATH: —';
+        });
+
         this.dom.themeSelector.addEventListener('change', (e) => this.applyTheme(e.target.value));
 
-        this.dom.fft.addEventListener('change', () => this.onConfigChange());
+        this.dom.fftSizePreset.addEventListener('change', (e) => {
+            const selectedValue = e.target.value;
+            const index = this.FFT_SIZES.indexOf(parseInt(selectedValue, 10));
+            this.dom.fftRangeSlider.value = index;
+            this.onConfigChange();
+        });
+        this.dom.fftRangeSlider.addEventListener('input', (e) => {
+            const index = parseInt(e.target.value, 10);
+            const fftSize = this.FFT_SIZES[index];
+            this.dom.fftSizePreset.value = fftSize;
+            this.onConfigChange();
+        });
+        
         this.dom.smoothing.addEventListener('input', () => {
           if (this.state.analyser) this.state.analyser.smoothingTimeConstant = parseFloat(this.dom.smoothing.value);
         });
@@ -403,8 +433,8 @@
             this.dom.heatmapRangeSlider.value = this.state.heatmapRangeMax;
             this.updateHeatmapRangeText();
         });
-        this.dom.heatmapRangeSlider.addEventListener('input', (e) => {
-            this.state.heatmapRangeMax = parseInt(e.target.value, 10);
+        this.dom.heatmapRangeSlider.addEventListener('input', () => {
+            this.state.heatmapRangeMax = parseInt(this.dom.heatmapRangeSlider.value, 10);
             this.updateHeatmapRangeText();
         });
         
@@ -520,7 +550,7 @@
       
       onConfigChange() {
           if (!this.state.analyser) return;
-          this.state.analyser.fftSize = parseInt(this.dom.fft.value, 10);
+          this.state.analyser.fftSize = parseInt(this.dom.fftSizePreset.value, 10);
           this.state.analyser.smoothingTimeConstant = parseFloat(this.dom.smoothing.value);
           
           this.state.dataArray = new Uint8Array(this.state.analyser.fftSize);
@@ -533,6 +563,7 @@
           this.state.peakOct = new Float32Array(this.state.bands.length);
           this.state.heatmapFreqBinMap = this.genHeatmapBins();
           this.state.heatmapData = [];
+          this.state.athHeatmap = { value: -Infinity, bin: 0 };
       }
 
       loop() {
@@ -591,7 +622,6 @@
           if (fh < fmin || fl > fm) continue;
           arr.push({ fc, fl: Math.max(fl, fmin), fh: Math.min(fh, fm) });
         }
-        if (arr.length) this.dom.octTitle.textContent = `RTA แบบ 1/${n} Octave (Linear Axis)`;
         return arr;
       }
 
@@ -665,7 +695,7 @@
           } else {
               this.dom.fftHoldText.style.display = 'none';
           }
-          this.drawPeakLine(ctx, this.mapLogX(peakFreqNow, plotW), plotH, 'rgba(100,149,237,.6)');
+          this.drawPeakLine(ctx, this.mapLogX(peakFreqNow, plotW), plotH, 'rgba(100,149,27,.6)');
           if (this.state.guideFFT) this.drawGuide(ctx, this.state.guideFFT.xPx, plotH);
       }
 
@@ -734,6 +764,26 @@
               return { db: avgDb };
           });
           
+          let currentPeakBin = 0, currentPeakVal = -Infinity;
+          for (let i = 0; i < frame.length; i++) {
+              if (frame[i].db > currentPeakVal) {
+                  currentPeakVal = frame[i].db;
+                  currentPeakBin = i;
+              }
+          }
+          
+          if (currentPeakVal > this.state.athHeatmap.value) {
+              this.state.athHeatmap = { value: currentPeakVal, bin: currentPeakBin };
+          }
+
+          const athFreqBin = this.state.heatmapFreqBinMap[this.state.athHeatmap.bin];
+          if (athFreqBin && this.state.athHeatmap.value > -Infinity) {
+              const athFreq = (athFreqBin.fStart + athFreqBin.fEnd) / 2;
+              this.dom.heatmapAthText.textContent = `ATH: ${this.fmtHz(athFreq)}`;
+          } else {
+              this.dom.heatmapAthText.textContent = 'ATH: —';
+          }
+
           this.state.heatmapData.unshift(frame);
           if (this.state.heatmapData.length > this.HEATMAP_TIME_SLICES) {
               this.state.heatmapData.pop();
@@ -842,7 +892,8 @@
       resetDbaValues() { this.state.maxDba = -Infinity; this.state.dbaValues = []; this.dom.dbRealtimeValue.textContent = '—'; this.dom.dbAvgValue.textContent = '—'; this.dom.dbMaxValue.textContent = '—'; }
       clearPeak() { this.state.peakArray.fill(0); this.state.peakOct.fill(0); }
       updateOctaveRangeText() { this.dom.octRangeText.textContent = `0–${this.state.octRangeMax}`; }
-      updateHeatmapRangeText() { this.dom.heatmapRangeText.textContent = `0 to -${this.state.heatmapRangeMax} dBFS`; }
+      // ตัด "0 to" ออกจากข้อความช่วง dB ของ Spectrogram
+      updateHeatmapRangeText() { this.dom.heatmapRangeText.textContent = `-${this.state.heatmapRangeMax} dBFS`; }
       
       showError(msg) { this.dom.errBox.style.display = 'block'; this.dom.errMsg.textContent = msg; }
       
