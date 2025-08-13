@@ -255,6 +255,7 @@
           holdEnabled: true,
           heatmapEnabled: false,
           heatmapIsHD: true,
+          frameCount: 0, // NEW: Frame counter for SD mode
           peakArray: null, peakOct: null,
           avgBuffer: null,
           octN: 12, bands: [],
@@ -320,9 +321,6 @@
           this.dom.btnHeatmapQuality.setAttribute('aria-pressed', this.state.heatmapIsHD);
           this.dom.btnHeatmapQuality.textContent = this.state.heatmapIsHD ? '🔥 HD' : '⚡️ SD';
           this.state.heatmapData = [];
-          // FIXED: Clear both buffers on mode change
-          this.canvases.heatmapBuffer1.ctx.clearRect(0, 0, this.canvases.heatmapBuffer1.canvas.width, this.canvases.heatmapBuffer1.canvas.height);
-          this.canvases.heatmapBuffer2.ctx.clearRect(0, 0, this.canvases.heatmapBuffer2.canvas.width, this.canvases.heatmapBuffer2.canvas.height);
           if (this.state.heatmapEnabled) {
               this.drawHeatmap(true);
           } else {
@@ -379,15 +377,8 @@
               fft: { canvas: this.dom.fftCanvas, ctx: this.dom.fftCanvas.getContext('2d'), tip: this.dom.fftTip },
               oct: { canvas: this.dom.octCanvas, ctx: this.dom.octCanvas.getContext('2d'), tip: this.dom.octTip },
               heatmap: { canvas: this.dom.heatmapCanvas, ctx: this.dom.heatmapCanvas.getContext('2d'), tip: this.dom.heatmapTip },
-              dbMeter: { canvas: this.dom.dbMeterCanvas, ctx: this.dom.dbMeterCanvas.getContext('2d') },
-              heatmapBuffer1: { canvas: document.createElement('canvas'), ctx: null },
-              heatmapBuffer2: { canvas: document.createElement('canvas'), ctx: null }
+              dbMeter: { canvas: this.dom.dbMeterCanvas, ctx: this.dom.dbMeterCanvas.getContext('2d') }
           };
-          this.canvases.heatmapBuffer1.ctx = this.canvases.heatmapBuffer1.canvas.getContext('2d');
-          this.canvases.heatmapBuffer2.ctx = this.canvases.heatmapBuffer2.canvas.getContext('2d');
-          this.canvases.readBuffer = this.canvases.heatmapBuffer1;
-          this.canvases.writeBuffer = this.canvases.heatmapBuffer2;
-
           this.handleResize();
           this.attachPressGuide(this.canvases.fft, 'fft');
           this.attachPressGuide(this.canvases.oct, 'oct');
@@ -399,9 +390,7 @@
         for (const key in this.canvases) {
             if (!this.canvases[key] || !this.canvases[key].canvas) continue;
             const { canvas, ctx } = this.canvases[key];
-
-            const referenceCanvas = (key.startsWith('heatmapBuffer')) ? this.dom.heatmapCanvas : canvas;
-            const parentEl = referenceCanvas.parentElement;
+            const parentEl = canvas.parentElement;
             if (!parentEl) continue;
 
             const rect = parentEl.getBoundingClientRect();
@@ -533,7 +522,10 @@
 
         const now = performance.now();
         if (this.state.heatmapEnabled && (now - this.state.lastHeatmapUpdate >= this.HEATMAP_UPDATE_MS)) {
-          this.drawHeatmap();
+          this.state.frameCount++;
+          if (this.state.heatmapIsHD || this.state.frameCount % 3 === 0) {
+            this.drawHeatmap();
+          }
           this.state.lastHeatmapUpdate = now;
         }
 
@@ -696,8 +688,6 @@
 
       drawHeatmap(forceRedraw = false) {
           const mainCtx = this.canvases.heatmap.ctx;
-          const writeBuffer = this.canvases.writeBuffer;
-          const readBuffer = this.canvases.readBuffer;
           const { width: w, height: h } = mainCtx.canvas;
           const dpr = window.devicePixelRatio || 1;
           const plotW = w / dpr, plotH = h / dpr;
@@ -712,43 +702,26 @@
               return { db: avgDb };
           });
           
-          if (this.state.heatmapIsHD || forceRedraw) {
-              this.state.heatmapData.unshift(frame);
-              if (this.state.heatmapData.length > this.HEATMAP_TIME_SLICES) this.state.heatmapData.pop();
-              
-              writeBuffer.ctx.clearRect(0, 0, plotW, plotH);
-              const timeScale = plotAreaH / this.HEATMAP_TIME_SLICES;
-              for (let i = 0; i < this.state.heatmapData.length; i++) {
-                  const y = i * timeScale;
-                  const row = this.state.heatmapData[i];
-                  for (let j = 0; j < row.length; j++) {
-                      const { fStart, fEnd } = this.state.heatmapFreqBinMap[j];
-                      const xL = this.mapLogX(fStart, plotW), xR = this.mapLogX(fEnd, plotW);
-                      writeBuffer.ctx.fillStyle = this.mapDbToColorHeatmap(row[j].db);
-                      writeBuffer.ctx.fillRect(xL, y, Math.max(1, xR - xL), timeScale);
-                  }
-              }
-          } else {
-              const timeStep = plotAreaH / this.HEATMAP_TIME_SLICES;
-              writeBuffer.ctx.clearRect(0, 0, plotW, plotH);
-              writeBuffer.ctx.drawImage(readBuffer.canvas, 0, 0, plotW, plotH - timeStep, 0, timeStep, plotW, plotH - timeStep);
-              for (let j = 0; j < frame.length; j++) {
-                  const { fStart, fEnd } = this.state.heatmapFreqBinMap[j];
-                  const xL = this.mapLogX(fStart, plotW), xR = this.mapLogX(fEnd, plotW);
-                  writeBuffer.ctx.fillStyle = this.mapDbToColorHeatmap(frame[j].db);
-                  writeBuffer.ctx.fillRect(xL, 0, Math.max(1, xR - xL), timeStep);
-              }
+          this.state.heatmapData.unshift(frame);
+          if (this.state.heatmapData.length > this.HEATMAP_TIME_SLICES) {
+              this.state.heatmapData.pop();
           }
           
           this.drawHeatmapBackground(mainCtx);
-          mainCtx.drawImage(writeBuffer.canvas, 0, 0, plotW, plotH);
+          const timeScale = plotAreaH / this.HEATMAP_TIME_SLICES;
+          for (let i = 0; i < this.state.heatmapData.length; i++) {
+              const y = i * timeScale;
+              const row = this.state.heatmapData[i];
+              for (let j = 0; j < row.length; j++) {
+                  const { fStart, fEnd } = this.state.heatmapFreqBinMap[j];
+                  const xL = this.mapLogX(fStart, plotW), xR = this.mapLogX(fEnd, plotW);
+                  mainCtx.fillStyle = this.mapDbToColorHeatmap(row[j].db);
+                  mainCtx.fillRect(xL, y, Math.max(1, xR - xL), timeScale);
+              }
+          }
+          
           this.drawHeatmapGrid(mainCtx);
           if (this.state.guideHeatmap) this.drawHeatmapGuide(mainCtx, this.state.guideHeatmap.xPx, plotH);
-
-          // Swap buffers for the next frame
-          let temp = this.canvases.readBuffer;
-          this.canvases.readBuffer = this.canvases.writeBuffer;
-          this.canvases.writeBuffer = temp;
       }
       
       drawHeatmapBackground(ctx) {
