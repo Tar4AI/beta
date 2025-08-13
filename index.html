@@ -44,7 +44,7 @@
     [data-theme="vintage-amber"] {
       --bg1:#292524; --bg2:#1c1917; --card:#44403C; --text:#D6D3D1; --muted:#A8A29E;
       --gridH:rgba(255,250,235,.1); --gridV:rgba(255,250,235,.05);
-      --frame:rgba(255,250,235,.12); --label:rgba(255,250,235,.9);
+      --frame:rgba(255,250,235,.12); --label:rgba(255,255,255,.9);
       --fft:#F59E0B; --peak:#FDE68A; --hold:#FDBA74; --bar:#F59E0B;
       --heatmap-color-1:#292524; --heatmap-color-2:#78716C; --heatmap-color-3:#F59E0B;
       --heatmap-color-4:#FBBF24; --heatmap-color-5:#EF4444;
@@ -108,9 +108,6 @@
     input[type="range"], input[type="checkbox"] {
       accent-color: var(--accent-color);
     }
-
-    details.dev summary { cursor: pointer; }
-    .status { display:inline-block; padding:2px 6px; border-radius:999px; font-size:12px; border:1px solid rgba(255,255,255,.12); background:rgba(0,0,0,.3); }
   </style>
 </head>
 <body>
@@ -127,38 +124,36 @@
 
     <div class="card">
       <div class="row" style="justify-content:space-between;align-items:center;">
-        <h2 style="margin:0 0 4px 0">my RTAs (v. 1.0) 14/8/68</h2>
+        <h2 style="margin:0 0 4px 0">my RTAs (Pro)</h2>
         <div class="row">
           <button id="btnStart">▶️ เริ่มวัด</button>
           <button id="btnStop" class="secondary" disabled>⏸️ หยุด</button>
           <button id="btnHold" class="ghost" aria-pressed="true">📌 Hold Peak: ON</button>
           <button id="btnClear" class="secondary">♻️ Clear Peak</button>
+          <button id="btnAweight" class="ghost" aria-pressed="false" title="สลับ A-weighting">A-weighting: OFF</button>
         </div>
       </div>
 
       <div class="row" style="margin-top:8px">
         <label> Smoothing <input id="smoothing" type="range" min="0" max="0.95" step="0.01" value="0.75"></label>
         <label> Averaging <input id="avg" type="checkbox" checked></label>
-        <label> A-weighting (เดโม่) <input id="aWeight" type="checkbox"></label>
-        <span class="status" id="secureStatus">Secure: —</span>
-        <span class="status" id="permStatus">Mic Perm: —</span>
       </div>
 
       <div class="row" style="justify-content:space-between;">
         <div class="row">
-            <label>พยายามปิด DSP ของระบบ:</label>
-            <div class="row">
-              <label>echoCancellation <input id="ec" type="checkbox" checked></label>
-              <label>noiseSuppression <input id="ns" type="checkbox" checked></label>
-              <label>autoGainControl <input id="agc" type="checkbox" checked></label>
-            </div>
+          <label>พยายามปิด DSP ของระบบ:</label>
+          <div class="row">
+            <label>echoCancellation <input id="ec" type="checkbox" checked></label>
+            <label>noiseSuppression <input id="ns" type="checkbox" checked></label>
+            <label>autoGainControl <input id="agc" type="checkbox" checked></label>
+          </div>
         </div>
         <label>Theme
-            <select id="themeSelector">
-              <option value="dark-matter">Dark Matter</option>
-              <option value="studio-blue">Studio Blue</option>
-              <option value="vintage-amber">Vintage Amber</option>
-            </select>
+          <select id="themeSelector">
+            <option value="dark-matter">Dark Matter</option>
+            <option value="studio-blue">Studio Blue</option>
+            <option value="vintage-amber">Vintage Amber</option>
+          </select>
         </label>
       </div>
     </div>
@@ -243,7 +238,7 @@
                 <option value="50" selected>50</option> <option value="60">60</option> <option value="80">80</option> <option value="100">100</option>
               </select>
             </label>
-            <span class="hint" id="heatmapRangeText">-50</span>
+            <span class="hint" id="heatmapRangeText">-50 dBFS</span>
           </div>
         </div>
         <div class="plot">
@@ -267,7 +262,7 @@
         </div>
         <div class="dba-values-row" style="margin-top:12px;">
           <div class="kv-item"><b>Realtime (dB)</b><span id="dbRealtimeValue">—</span></div>
-          <div class="kv-item"><b>AVG (dB)</b><span id="dbAvgValue">—</span></div>
+          <div class="kv-item"><b>AVG (ดB)</b><span id="dbAvgValue">—</span></div>
           <div class="kv-item"><b>MAX (dB)</b><span id="dbMaxValue">—</span></div>
         </div>
       </div>
@@ -284,11 +279,6 @@
     </div>
 
     <div class="card hint">ข้อจำกัด: ไมค์มือถือมี DSP/AGC และการตอบสนองความถี่ไม่แฟลต ใช้ดูแนว EQ ได้แต่ไม่ใช่มาตรวัด SPL มืออาชีพ</div>
-
-    <details class="card dev">
-      <summary>Dev Diagnostics / Tests</summary>
-      <div id="testResults" class="hint">กำลังรันเทสต์…</div>
-    </details>
   </div>
 
   <script>
@@ -313,6 +303,7 @@
           holdEnabled: true,
           heatmapEnabled: false,
           heatmapIsHD: true,
+          aWeightEnabled: false,
           peakArray: null, peakOct: null, 
           athHeatmap: { value: -Infinity, bin: 0 },
           avgBuffer: null,
@@ -337,32 +328,11 @@
         this.updateHeatmapRangeText();
         this.drawInitialFrames();
         this.preflight();
-        this.runTests();
       }
 
       preflight() {
-        const secure = window.isSecureContext || /^localhost$|^127\.[0-9.]+$/.test(location.hostname);
-        this.dom.secureStatus.textContent = `Secure: ${secure ? 'yes' : 'no'}`;
-        this.dom.secureStatus.style.background = secure ? 'rgba(16,185,129,.2)' : 'rgba(245,158,11,.2)';
         if (!navigator.mediaDevices?.getUserMedia) {
           this.showError('เบราว์เซอร์ไม่รองรับ getUserMedia — ลองใช้ Chrome/Edge/Firefox หรือ Safari รุ่นใหม่');
-        }
-        if (navigator.permissions && navigator.permissions.query) {
-          try {
-            navigator.permissions.query({ name: 'microphone' }).then((p) => {
-              this.dom.permStatus.textContent = `Mic Perm: ${p.state}`;
-              this.dom.permStatus.style.background = p.state === 'granted' ? 'rgba(16,185,129,.2)' : (p.state === 'prompt' ? 'rgba(59,130,246,.2)' : 'rgba(239,68,68,.2)');
-            }).catch(()=>{});
-          } catch(_){}
-        }
-      }
-
-      runTests() {
-        try {
-          const ok = !!(window.AudioContext || window.webkitAudioContext);
-          this.dom.testResults.textContent = ok ? 'OK: WebAudio พร้อมใช้งาน' : 'ผิดพลาด: ไม่มี WebAudio';
-        } catch (e) {
-          this.dom.testResults.textContent = 'ผิดพลาด: ' + (e.message || e);
         }
       }
 
@@ -370,8 +340,8 @@
 
       getDOMElements() {
         const ids = [
-          'btnStart', 'btnStop', 'btnHold', 'btnClear', 'btnToggleHeatmap', 'btnHeatmapQuality', 'btnResetDba', 'btnClearAth', 'btnStartDemo',
-          'fftSizePreset', 'smoothing', 'avg', 'aWeight', 'ec', 'ns', 'agc', 'themeSelector', 'fftRangeSlider',
+          'btnStart', 'btnStop', 'btnHold', 'btnClear', 'btnToggleHeatmap', 'btnHeatmapQuality', 'btnResetDba', 'btnClearAth', 'btnStartDemo', 'btnAweight',
+          'fftSizePreset', 'smoothing', 'avg', 'ec', 'ns', 'agc', 'themeSelector', 'fftRangeSlider',
           'fftPeakText', 'fftHoldText', 'octPeakText', 'octHoldText', 'heatmapAthText',
           'fftCanvas', 'octCanvas', 'heatmapCanvas', 'dbMeterCanvas',
           'fftTip', 'octTip', 'heatmapTip',
@@ -379,7 +349,7 @@
           'calibrationOffset', 'octTitle', 'octRes',
           'octRangePreset', 'octRangeSlider', 'octRangeText',
           'heatmapRangeSlider', 'heatmapRangePreset', 'heatmapRangeText',
-          'rms', 'peak', 'errBox', 'errMsg', 'secureStatus', 'permStatus', 'testResults'
+          'rms', 'peak', 'errBox', 'errMsg'
         ];
         const dom = {};
         ids.forEach(id => dom[id] = document.getElementById(id));
@@ -397,6 +367,12 @@
           this.state.holdEnabled = !this.state.holdEnabled;
           this.dom.btnHold.setAttribute('aria-pressed', this.state.holdEnabled);
           this.dom.btnHold.textContent = `📌 Hold Peak: ${this.state.holdEnabled ? 'ON' : 'OFF'}`;
+        });
+
+        this.dom.btnAweight.addEventListener('click', () => {
+          this.state.aWeightEnabled = !this.state.aWeightEnabled;
+          this.dom.btnAweight.setAttribute('aria-pressed', this.state.aWeightEnabled);
+          this.dom.btnAweight.textContent = `A-weighting: ${this.state.aWeightEnabled ? 'ON' : 'OFF'}`;
         });
 
         this.dom.btnToggleHeatmap.addEventListener('click', () => {
@@ -791,18 +767,15 @@
 
         if (labelText) {
           // Draw pill label near the top, auto-clamped inside plot
-          const plotLeft = this.PAD.L, plotRight = ctx.canvas.getBoundingClientRect().width - this.PAD.R;
           const ctxW = ctx.canvas.width / (window.devicePixelRatio || 1);
-          const plotW = ctxW; // already using CSS pixels
           const padX = 6, padY = 4;
           ctx.save();
           ctx.font = '12px system-ui';
           const textW = ctx.measureText(labelText).width;
           let labelHalf = (textW + padX*2)/2;
-          // clamp x so label stays in-frame
           let xLabel = x;
           if (xLabel - labelHalf < this.PAD.L + 2) xLabel = this.PAD.L + 2 + labelHalf;
-          if (xLabel + labelHalf > plotW - this.PAD.R - 2) xLabel = plotW - this.PAD.R - 2 - labelHalf;
+          if (xLabel + labelHalf > ctxW - this.PAD.R - 2) xLabel = ctxW - this.PAD.R - 2 - labelHalf;
           const yLabel = this.PAD.T + 8;
           const rectX = xLabel - labelHalf, rectY = yLabel - (padY + 8), rectW = textW + padX*2, rectH = 18;
 
@@ -895,7 +868,7 @@
               let sum = 0, cnt = 0;
               for (let i = s; i <= e; i++) { sum += this.state.freqArray[i]; cnt++; }
               let v = cnt ? (sum / cnt) : 0;
-              if (this.dom.aWeight.checked) v *= Math.pow(10, this.aWeighting(b.fc) / 20);
+              if (this.state.aWeightEnabled) v *= Math.pow(10, this.aWeighting(b.fc) / 20);
               return v;
           });
           if (this.state.holdEnabled) {
@@ -1031,7 +1004,20 @@
       drawHeatmapGuide(ctx, x, h) { ctx.save(); ctx.strokeStyle = 'rgba(100,149,237,.75)'; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h - this.PAD.B); ctx.stroke(); ctx.restore(); }
 
       updateRMS() { if (!this.state.dataArray) return; let sum = 0; for (let i = 0; i < this.state.dataArray.length; i++) { const v = (this.state.dataArray[i] - 128) / 128; sum += v * v; } const rms = Math.sqrt(sum / this.state.dataArray.length); this.dom.rms.textContent = (20 * Math.log10(rms + 1e-12)).toFixed(1) + ' dBFS'; }
-      calculateDba() { if (!this.state.freqArray || !this.state.analyser) return -Infinity; const N = this.state.freqArray.length, fpb = this.state.sampleRate / this.state.analyser.fftSize; let sum = 0; for (let i = 0; i < N; i++) { const f = i * fpb; const aw = Math.pow(10, this.aWeighting(f) / 20); const v = this.state.freqArray[i] * aw; sum += v * v; } const rms = Math.sqrt(sum / N); const dbfsValue = 20 * Math.log10(rms / 255 + 1e-12); return dbfsValue + this.state.calibrationOffset; }
+      calculateDba() { 
+        if (!this.state.freqArray || !this.state.analyser) return -Infinity; 
+        const N = this.state.freqArray.length, fpb = this.state.sampleRate / this.state.analyser.fftSize; 
+        let sum = 0; 
+        for (let i = 0; i < N; i++) { 
+          const f = i * fpb; 
+          const aw = this.state.aWeightEnabled ? Math.pow(10, this.aWeighting(f) / 20) : 1; 
+          const v = this.state.freqArray[i] * aw; 
+          sum += v * v; 
+        } 
+        const rms = Math.sqrt(sum / N); 
+        const dbfsValue = 20 * Math.log10(rms / 255 + 1e-12); 
+        return dbfsValue + this.state.calibrationOffset; 
+      }
       drawDbMeterBackground() { const { ctx } = this.canvases.dbMeter; const { width: w, height: h } = ctx.canvas; ctx.clearRect(0, 0, w, h); }
       
       updateDbMeter(db) {
