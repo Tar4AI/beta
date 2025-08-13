@@ -1,16 +1,16 @@
 <!DOCTYPE html>
-<html lang="th" data-theme="dark-matter">
+<html lang="th" data-theme="studio-blue">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#1a202c" />
-  <meta name="theme-color" content="#1a202c" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#0F172A" />
+  <meta name="theme-color" content="#0F172A" media="(prefers-color-scheme: dark)" />
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Mobile RTA (Pro Refactor with Off-screen Canvas)</title>
 
   <style>
-    /* --- Theme: Dark Matter (Default) --- */
+    /* --- Theme: Dark Matter --- */
     :root, [data-theme="dark-matter"] {
       --bg1:#1a202c; --bg2:#1a202c; --card:#2d3748; --text:#cbd5e1; --muted:#718096;
       --gridH:rgba(255,255,255,.08); --gridV:rgba(255,255,255,.04);
@@ -25,7 +25,7 @@
       --accent-color: #2DD4BF; /* Teal */
     }
 
-    /* --- Theme: Studio Blue --- */
+    /* --- Theme: Studio Blue (ค่าเริ่มต้น) --- */
     [data-theme="studio-blue"] {
       --bg1:#0F172A; --bg2:#1E293B; --card:#1E293B; --text:#E2E8F0; --muted:#64748B;
       --gridH:rgba(255,255,255,.1); --gridV:rgba(255,255,255,.05);
@@ -151,7 +151,7 @@
         <label>Theme
           <select id="themeSelector">
             <option value="dark-matter">Dark Matter</option>
-            <option value="studio-blue">Studio Blue</option>
+            <option value="studio-blue" selected>Studio Blue</option>
             <option value="vintage-amber">Vintage Amber</option>
           </select>
         </label>
@@ -321,13 +321,16 @@
       }
 
       init() {
-        this.applyTheme('dark-matter');
+        this.applyTheme('studio-blue');        // ค่าเริ่มต้นเป็น Blue
         this.setupEventListeners();
         this.setupCanvases();
         this.updateOctaveRangeText();
         this.updateHeatmapRangeText();
         this.drawInitialFrames();
         this.preflight();
+
+        // ให้ตัวเลือกธีมตรงกับค่าเริ่มต้น
+        this.dom.themeSelector.value = 'studio-blue';
       }
 
       preflight() {
