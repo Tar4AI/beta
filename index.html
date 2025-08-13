@@ -226,9 +226,8 @@
         this.PAD = { L: 40, R: 10, T: 10, B: 32 };
         this.LABEL_Y = 10;
         this.HEATMAP_TIME_SLICES = 200;
-        // NEW: Define resolutions for HD and SD modes
         this.HEATMAP_BINS_HD = 300;
-        this.HEATMAP_BINS_SD = 120;
+        this.HEATMAP_BINS_SD = 60;
 
         this.colors = {
           gridH: this.getStyle('--gridH'), gridV: this.getStyle('--gridV'),
@@ -260,6 +259,7 @@
           avgBuffer: null,
           octN: 12, bands: [],
           heatmapData: [], heatmapFreqBinMap: null,
+          lastHeatmapUpdate: 0, // Used for throttling heatmap updates
           calibrationOffset: 100,
           maxDba: -Infinity, dbaValues: [],
           octRangeMax: 255, heatmapRangeMax: 50,
@@ -320,7 +320,6 @@
           this.state.heatmapIsHD = !this.state.heatmapIsHD;
           this.dom.btnHeatmapQuality.setAttribute('aria-pressed', this.state.heatmapIsHD);
           this.dom.btnHeatmapQuality.textContent = this.state.heatmapIsHD ? '🔥 HD' : '⚡️ SD';
-          // Regenerate bins with new resolution and clear data
           this.state.heatmapFreqBinMap = this.genHeatmapBins();
           this.state.heatmapData = [];
           if (this.state.heatmapEnabled) {
@@ -522,8 +521,11 @@
         this.updateRMS();
         this.updateDba();
 
-        if (this.state.heatmapEnabled) {
+        // FIXED: Re-introduced time-based throttling for heatmap
+        const now = performance.now();
+        if (this.state.heatmapEnabled && (now - this.state.lastHeatmapUpdate >= 33)) {
           this.drawHeatmap();
+          this.state.lastHeatmapUpdate = now;
         }
 
         this.state.rafId = requestAnimationFrame(() => this.loop());
@@ -844,4 +846,3 @@
   </script>
 </body>
 </html>
-" and the query is "ลองวิธีนี
