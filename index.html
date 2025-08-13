@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="th">
+<html lang="th" data-theme="dark-matter">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
@@ -10,7 +10,8 @@
   <title>Mobile RTA (Pro Refactor with Off-screen Canvas)</title>
 
   <style>
-    :root{
+    /* --- Theme: Dark Matter (Default) --- */
+    :root, [data-theme="dark-matter"] {
       --bg1:#1a202c; --bg2:#1a202c; --card:#2d3748; --text:#cbd5e1; --muted:#718096;
       --gridH:rgba(255,255,255,.08); --gridV:rgba(255,255,255,.04);
       --frame:rgba(255,255,255,.1); --label:rgba(255,255,255,.65);
@@ -21,20 +22,53 @@
       --dba-meter-bg-yellow: #f6ad55;
       --dba-meter-bg-orange: #ed8936;
       --dba-meter-bg-red: #e53e3e;
+      --accent-color: #48bb78;
     }
+
+    /* --- Theme: Studio Blue --- */
+    [data-theme="studio-blue"] {
+      --bg1:#0F172A; --bg2:#1E293B; --card:#1E293B; --text:#E2E8F0; --muted:#64748B;
+      --gridH:rgba(255,255,255,.1); --gridV:rgba(255,255,255,.05);
+      --frame:rgba(255,255,255,.12); --label:rgba(255,255,255,.7);
+      --fft:#22D3EE; --peak:#A78BFA; --hold:#F472B6; --bar:#22D3EE;
+      --heatmap-color-1:#0F172A; --heatmap-color-2:#334155; --heatmap-color-3:#0EA5E9;
+      --heatmap-color-4:#A78BFA; --heatmap-color-5:#F472B6;
+      --dba-meter-bg-green: #22D3EE;
+      --dba-meter-bg-yellow: #A78BFA;
+      --dba-meter-bg-orange: #EC4899;
+      --dba-meter-bg-red: #F43F5E;
+      --accent-color: #22D3EE;
+    }
+
+    /* --- Theme: Vintage Amber --- */
+    [data-theme="vintage-amber"] {
+      --bg1:#292524; --bg2:#1c1917; --card:#44403C; --text:#D6D3D1; --muted:#A8A29E;
+      --gridH:rgba(255,250,235,.1); --gridV:rgba(255,250,235,.05);
+      --frame:rgba(255,250,235,.12); --label:rgba(255,250,235,.7);
+      --fft:#F59E0B; --peak:#FDE68A; --hold:#FDBA74; --bar:#F59E0B;
+      --heatmap-color-1:#292524; --heatmap-color-2:#78716C; --heatmap-color-3:#F59E0B;
+      --heatmap-color-4:#EF4444; --heatmap-color-5:#FBBF24;
+      --dba-meter-bg-green: #F59E0B;
+      --dba-meter-bg-yellow: #FACC15;
+      --dba-meter-bg-orange: #FB923C;
+      --dba-meter-bg-red: #EF4444;
+      --accent-color: #F59E0B;
+    }
+
     :root{ color-scheme:dark }
-    html{ background:#1a202c }
+    html{ background:var(--bg1) }
     body{
       margin:0; height:100%;
-      background:radial-gradient(1200px 600px at 70% -10%, #2d3748 10%, var(--bg1) 60%, var(--bg2) 100%);
+      background:radial-gradient(1200px 600px at 70% -10%, var(--card) 10%, var(--bg1) 60%, var(--bg2) 100%);
       color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans Thai",sans-serif;
       -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; overscroll-behavior:contain;
+      transition: background .3s, color .3s;
     }
     /* จัดการ Safe Area สำหรับอุปกรณ์ที่มีรอยบาก (Notch) */
-    body::before,body::after{content:"";position:fixed;left:0;right:0;z-index:9999;background:#1a202c;pointer-events:none}
+    body::before,body::after{content:"";position:fixed;left:0;right:0;z-index:9999;background:var(--bg1);pointer-events:none}
     body::before{top:0;height:env(safe-area-inset-top)} body::after{bottom:0;height:env(safe-area-inset-bottom)}
     @supports(padding: env(safe-area-inset-left)){
-      html::before,html::after{content:"";position:fixed;top:0;bottom:0;background:#1a202c;z-index:9998;pointer-events:none}
+      html::before,html::after{content:"";position:fixed;top:0;bottom:0;background:var(--bg1);z-index:9998;pointer-events:none}
       html::before{left:0;width:env(safe-area-inset-left)} html::after{right:0;width:env(safe-area-inset-right)}
     }
 
@@ -45,14 +79,14 @@
       padding-bottom:calc(12px + env(safe-area-inset-bottom));
     }
     .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-    .card{background:var(--card);border:1px solid #4a5568;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.25);padding:12px}
+    .card{background:var(--card);border:1px solid rgba(255,255,255,.1);border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.25);padding:12px; transition: background-color .3s, border-color .3s;}
     button,select,input[type=range],input[type=number]{-webkit-tap-highlight-color:transparent}
-    button{background:#48bb78;border:none;color:white;padding:10px 14px;border-radius:12px;font-weight:700;cursor:pointer;transition:background-color .2s, opacity .2s;}
+    button{background:var(--accent-color);border:none;color:white;padding:10px 14px;border-radius:12px;font-weight:700;cursor:pointer;transition:background-color .2s, opacity .2s;}
     button:disabled{opacity:.5;cursor:not-allowed;}
-    button.secondary{background:#4a5568} button.ghost{background:#4a5568}
+    button.secondary{background:rgba(0,0,0,.2);} button.ghost{background:rgba(0,0,0,.2);}
     label{font-size:12px;color:var(--muted)}
     .meters{display:grid;grid-template-columns:1fr;gap:12px}
-    canvas{width:100%;height:320px;background:#1a202c;border-radius:12px;touch-action:none; display: block;}
+    canvas{width:100%;height:320px;background:var(--bg1);border-radius:12px;touch-action:none; display: block; transition: background-color .3s;}
 
     #dbMeterContainer{position:relative;background:rgba(255,255,255,.1);border-radius:999px;overflow:hidden}
     #dbMeterCanvas{height:20px;background:transparent;border-radius:999px}
@@ -60,16 +94,20 @@
 
     .hint{font-size:12px;color:var(--muted)}
     .kv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-    .kv div{background:#2d3748;border:1px solid #4a5568;border-radius:12px;padding:8px}
-    .kv b{display:block;color:#cbd5e1;font-size:12px;margin-bottom:4px}
+    .kv div{background:rgba(0,0,0,.2);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:8px}
+    .kv b{display:block;color:var(--text);font-size:12px;margin-bottom:4px}
     .badges{display:flex;justify-content:flex-end;gap:6px;}
     .badge{padding:4px 8px;border-radius:999px;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.12);font-size:12px;color:#e5e7eb;white-space:nowrap}
     .tip{position:absolute;padding:4px 6px;font-size:12px;color:#e5e7eb;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.12);border-radius:8px;transform:translate(-50%,-100%);pointer-events:none;white-space:nowrap;z-index:10}
     .plot{position:relative; height: 320px; margin-top: 8px;}
 
     .dba-values-row{display:flex;justify-content:space-between;gap:8px}
-    .dba-values-row .kv-item{flex:1;background:#2d3748;border:1px solid #4a5568;border-radius:12px;padding:8px;text-align:center}
-    .dba-values-row .kv-item b{display:block;color:#cbd5e1;font-size:12px;margin-bottom:4px}
+    .dba-values-row .kv-item{flex:1;background:rgba(0,0,0,.2);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:8px;text-align:center}
+    .dba-values-row .kv-item b{display:block;color:var(--text);font-size:12px;margin-bottom:4px}
+    
+    input[type="range"], input[type="checkbox"] {
+      accent-color: var(--accent-color);
+    }
   </style>
 </head>
 <body>
@@ -105,13 +143,22 @@
         <label> A-weighting (เดโม่) <input id="aWeight" type="checkbox"></label>
       </div>
 
-      <div class="row">
-        <label>พยายามปิด DSP ของระบบ (บางเครื่องอาจไม่ยอมปิด):</label>
+      <div class="row" style="justify-content:space-between;">
         <div class="row">
-          <label>echoCancellation <input id="ec" type="checkbox" checked></label>
-          <label>noiseSuppression <input id="ns" type="checkbox" checked></label>
-          <label>autoGainControl <input id="agc" type="checkbox" checked></label>
+            <label>พยายามปิด DSP ของระบบ:</label>
+            <div class="row">
+              <label>echoCancellation <input id="ec" type="checkbox" checked></label>
+              <label>noiseSuppression <input id="ns" type="checkbox" checked></label>
+              <label>autoGainControl <input id="agc" type="checkbox" checked></label>
+            </div>
         </div>
+        <label>Theme
+            <select id="themeSelector">
+              <option value="dark-matter">Dark Matter</option>
+              <option value="studio-blue">Studio Blue</option>
+              <option value="vintage-amber">Vintage Amber</option>
+            </select>
+        </label>
       </div>
     </div>
 
@@ -232,25 +279,8 @@
         this.HEATMAP_BINS_HD = 300;
         this.HEATMAP_BINS_SD = 60;
 
-        this.colors = {
-          gridH: this.getStyle('--gridH'), gridV: this.getStyle('--gridV'),
-          frame: this.getStyle('--frame'), label: this.getStyle('--label'),
-          fft: this.getStyle('--fft'), peak: this.getStyle('--peak'),
-          hold: this.getStyle('--hold'), bar: this.getStyle('--bar'),
-          heatmap: [
-            this.getStyle('--heatmap-color-1'), this.getStyle('--heatmap-color-2'),
-            this.getStyle('--heatmap-color-3'), this.getStyle('--heatmap-color-4'),
-            this.getStyle('--heatmap-color-5')
-          ],
-          dbMeter: {
-            green: this.getStyle('--dba-meter-bg-green'),
-            yellow: this.getStyle('--dba-meter-bg-yellow'),
-            orange: this.getStyle('--dba-meter-bg-orange'),
-            red: this.getStyle('--dba-meter-bg-red')
-          }
-        };
-
         this.dom = this.getDOMElements();
+        this.colors = {};
         
         this.state = {
           audioCtx: null, analyser: null, micSrc: null, rafId: null,
@@ -275,6 +305,7 @@
       }
 
       init() {
+        this.applyTheme('dark-matter');
         this.setupEventListeners();
         this.setupCanvases();
         this.updateOctaveRangeText();
@@ -287,7 +318,7 @@
       getDOMElements() {
         const ids = [
           'btnStart', 'btnStop', 'btnHold', 'btnClear', 'btnToggleHeatmap', 'btnHeatmapQuality', 'btnResetDba',
-          'fft', 'smoothing', 'avg', 'aWeight', 'ec', 'ns', 'agc',
+          'fft', 'smoothing', 'avg', 'aWeight', 'ec', 'ns', 'agc', 'themeSelector',
           'fftPeakText', 'fftHoldText', 'octPeakText', 'octHoldText',
           'fftCanvas', 'octCanvas', 'heatmapCanvas', 'dbMeterCanvas',
           'fftTip', 'octTip', 'heatmapTip',
@@ -333,6 +364,8 @@
               this.drawHeatmapOverlay();
           }
         });
+
+        this.dom.themeSelector.addEventListener('change', (e) => this.applyTheme(e.target.value));
 
         this.dom.fft.addEventListener('change', () => this.onConfigChange());
         this.dom.smoothing.addEventListener('input', () => {
@@ -844,6 +877,39 @@
         canvas.addEventListener('touchstart', onDown, { passive: false });
         canvas.addEventListener('touchmove', onMove, { passive: false });
         canvas.addEventListener('touchend', onUp);
+      }
+
+      applyTheme(themeName) {
+        document.documentElement.dataset.theme = themeName;
+        setTimeout(() => {
+          this.updateColors();
+          this.drawInitialFrames();
+          if (this.state.running) {
+            this.drawFFT();
+            this.drawOctave();
+            if (this.state.heatmapEnabled) this.drawHeatmap(true);
+          }
+        }, 50);
+      }
+
+      updateColors() {
+        this.colors = {
+          gridH: this.getStyle('--gridH'), gridV: this.getStyle('--gridV'),
+          frame: this.getStyle('--frame'), label: this.getStyle('--label'),
+          fft: this.getStyle('--fft'), peak: this.getStyle('--peak'),
+          hold: this.getStyle('--hold'), bar: this.getStyle('--bar'),
+          heatmap: [
+            this.getStyle('--heatmap-color-1'), this.getStyle('--heatmap-color-2'),
+            this.getStyle('--heatmap-color-3'), this.getStyle('--heatmap-color-4'),
+            this.getStyle('--heatmap-color-5')
+          ],
+          dbMeter: {
+            green: this.getStyle('--dba-meter-bg-green'),
+            yellow: this.getStyle('--dba-meter-bg-yellow'),
+            orange: this.getStyle('--dba-meter-bg-orange'),
+            red: this.getStyle('--dba-meter-bg-red')
+          }
+        };
       }
     }
 
