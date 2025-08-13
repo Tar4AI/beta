@@ -59,10 +59,10 @@
     .kv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
     .kv div{background:#2d3748;border:1px solid #4a5568;border-radius:12px;padding:8px}
     .kv b{display:block;color:#cbd5e1;font-size:12px;margin-bottom:4px}
-    .badges{display:flex;justify-content:flex-end;gap:6px;margin:4px 0 6px 0}
+    .badges{display:flex;justify-content:flex-end;gap:6px;}
     .badge{padding:4px 8px;border-radius:999px;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.12);font-size:12px;color:#e5e7eb;white-space:nowrap}
     .tip{position:absolute;padding:4px 6px;font-size:12px;color:#e5e7eb;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.12);border-radius:8px;transform:translate(-50%,-100%);pointer-events:none;white-space:nowrap;z-index:10}
-    .plot{position:relative; height: 320px;}
+    .plot{position:relative; height: 320px; margin-top: 8px;}
 
     .dba-values-row{display:flex;justify-content:space-between;gap:8px}
     .dba-values-row .kv-item{flex:1;background:#2d3748;border:1px solid #4a5568;border-radius:12px;padding:8px;text-align:center}
@@ -114,12 +114,12 @@
 
     <div class="meters">
       <div class="card">
-        <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:2px">
+        <div class="row" style="justify-content:space-between;align-items:center;">
           <b>RTA แบบละเอียด (FFT, Log Frequency)</b>
-        </div>
-        <div class="badges">
-          <span class="badge" id="fftPeakText">Peak: —</span>
-          <span class="badge" id="fftHoldText" style="display:none;">Hold: —</span>
+          <div class="badges">
+            <span class="badge" id="fftPeakText">Peak: —</span>
+            <span class="badge" id="fftHoldText" style="display:none;">Hold: —</span>
+          </div>
         </div>
         <div class="plot">
           <canvas id="fftCanvas"></canvas>
@@ -140,18 +140,17 @@
               </select>
             </label>
             <span class="hint" id="octRangeText">0–255</span>
+            <span class="row" style="gap:10px;align-items:center; margin-left: auto;">
+              <label>Octave
+                <select id="octRes">
+                  <option value="3">1/3</option>
+                  <option value="6">1/6</option>
+                  <option value="12" selected>1/12</option>
+                </select>
+              </label>
+            </span>
           </div>
-          <span class="row" style="gap:10px;align-items:center">
-            <label>Octave
-              <select id="octRes">
-                <option value="3">1/3</option>
-                <option value="6">1/6</option>
-                <option value="12" selected>1/12</option>
-              </select>
-            </label>
-          </span>
         </div>
-
         <div class="badges">
           <span class="badge" id="octPeakText">Peak: —</span>
           <span class="badge" id="octHoldText" style="display:none;">Hold: —</span>
@@ -820,7 +819,6 @@
       
       showError(msg) { this.dom.errBox.style.display = 'block'; this.dom.errMsg.textContent = msg; }
       
-      // ===== FIXED: Simplified guide logic to prevent redraw =====
       attachPressGuide({ canvas, tip }, which) {
         let pressed = false;
         const getX = (e) => { const r = canvas.getBoundingClientRect(); const xCss = (e.touches ? e.touches[0].clientX : e.clientX) - r.left; return Math.max(this.PAD.L, Math.min(r.width - this.PAD.R, xCss)); };
@@ -834,7 +832,6 @@
             else if (which === 'oct') this.state.guideOCT = guideState;
             else if (which === 'heatmap') {
                 this.state.guideHeatmap = guideState;
-                // No forced redraw here. The main loop will handle it.
             }
         };
         const clear = () => {
@@ -843,7 +840,6 @@
             else if (which === 'oct') this.state.guideOCT = null;
             else if (which === 'heatmap') {
                 this.state.guideHeatmap = null;
-                 // No forced redraw here. The main loop will handle it.
             }
         };
         const onDown = (e) => { pressed = true; e.preventDefault(); update(getX(e)); };
